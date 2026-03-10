@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { 
   Card, 
@@ -28,12 +28,14 @@ export default function AuthPage() {
   const auth = useAuth();
   const router = useRouter();
   const { toast } = useToast();
-  const { user } = useUser();
+  const { user, isUserLoading } = useUser();
 
-  // Si el usuario ya está logueado con email (no anónimo), lo mandamos al dashboard
-  if (user && !user.isAnonymous) {
-    router.push("/");
-  }
+  // Efecto para redirigir si el usuario ya está autenticado
+  useEffect(() => {
+    if (!isUserLoading && user && !user.isAnonymous) {
+      router.push("/");
+    }
+  }, [user, isUserLoading, router]);
 
   const handleAuth = async (e: React.FormEvent<HTMLFormElement>, type: "login" | "register") => {
     e.preventDefault();
@@ -72,6 +74,14 @@ export default function AuthPage() {
       setIsLoading(false);
     }
   };
+
+  if (isUserLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4 relative overflow-hidden">
