@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { AppLayout } from "@/components/layout/app-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,7 +38,10 @@ import {
   List, 
   Edit3, 
   Package,
-  MoreVertical
+  MoreVertical,
+  TableProperties,
+  Save,
+  X
 } from "lucide-react";
 import { 
   useFirestore, 
@@ -60,6 +63,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 export default function InventoryPage() {
   const firestore = useFirestore();
@@ -68,10 +72,12 @@ export default function InventoryPage() {
   
   const [searchTerm, setSearchTerm] = useState("");
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isMassEditOpen, setIsMassEditOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [viewMode, setViewMode] = useState<"grid" | "list">("list");
+  const [massEditData, setMassEditData] = useState<any[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const productsRef = useMemoFirebase(() => {
@@ -94,6 +100,13 @@ export default function InventoryPage() {
     p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     p.sku?.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  // Inicializar datos para edición masiva cuando se abre el diálogo
+  useEffect(() => {
+    if (isMassEditOpen) {
+      setMassEditData(products.map(p => ({ ...p })));
+    }
+  }, [isMassEditOpen, products]);
 
   const handleSaveProduct = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -128,6 +141,33 @@ export default function InventoryPage() {
     }
     
     setSelectedCategory("");
+  };
+
+  const handleMassUpdateChange = (id: string, field: string, value: any) => {
+    setMassEditData(prev => prev.map(p => 
+      p.id === id ? { ...p, [field]: value } : p
+    ));
+  };
+
+  const saveMassChanges = () => {
+    if (!user || !firestore) return;
+    
+    massEditData.forEach(p => {
+      const original = products.find(op => op.id === p.id);
+      // Solo actualizar si algo cambió
+      if (original && (original.sku !== p.sku || original.price !== p.price || original.stockQuantity !== p.stockQuantity)) {
+        const docRef = doc(firestore, "users", user.uid, "products", p.id);
+        updateDocumentNonBlocking(docRef, {
+          sku: p.sku || "",
+          price: Number(p.price),
+          stockQuantity: Number(p.stockQuantity),
+          updatedAt: new Date().toISOString()
+        });
+      }
+    });
+
+    toast({ title: "Cambios Guardados", description: "Se han actualizado los productos seleccionados." });
+    setIsMassEditOpen(false);
   };
 
   const handleDelete = (productId: string) => {
@@ -217,6 +257,85 @@ export default function InventoryPage() {
               {isImporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
               Importar
             </Button>
+
+            <Dialog open={isMassEditOpen} onOpenChange={setIsMassEditOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="gap-2 border-primary text-primary hover:bg-primary/5">
+                  <TableProperties className="h-4 w-4" />
+                  Modificación Masiva
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0 overflow-hidden">
+                <DialogHeader className="p-6 border-b">
+                  <DialogTitle className="text-2xl font-bold flex items-center gap-2">
+                    <TableProperties className="h-6 w-6" />
+                    Edición Rápida de Inventario
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="flex-1 overflow-hidden">
+                  <ScrollArea className="h-full">
+                    <div className="p-6">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Producto</TableHead>
+                            <TableHead className="w-[180px]">SKU / Código</TableHead>
+                            <TableHead className="w-[120px]">Precio ($)</TableHead>
+                            <TableHead className="w-[100px]">Stock (U)</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {massEditData.map((p) => (
+                            <TableRow key={p.id}>
+                              <TableCell className="font-medium">
+                                <div className="flex flex-col">
+                                  <span className="text-sm truncate max-w-[200px]">{p.name}</span>
+                                  <span className="text-[10px] text-muted-foreground uppercase">{p.category}</span>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <Input 
+                                  value={p.sku || ""} 
+                                  onChange={(e) => handleMassUpdateChange(p.id, 'sku', e.target.value)}
+                                  className="h-8 text-xs font-mono"
+                                  placeholder="SKU"
+                                />
+                              </TableCell>
+                              <TableCell>
+                                <Input 
+                                  type="number" 
+                                  value={p.price || 0} 
+                                  onChange={(e) => handleMassUpdateChange(p.id, 'price', e.target.value)}
+                                  className="h-8 text-xs text-right font-bold text-primary"
+                                />
+                              </TableCell>
+                              <TableCell>
+                                <Input 
+                                  type="number" 
+                                  value={p.stockQuantity || 0} 
+                                  onChange={(e) => handleMassUpdateChange(p.id, 'stockQuantity', e.target.value)}
+                                  className={`h-8 text-xs text-right font-bold ${Number(p.stockQuantity) <= 5 ? 'text-red-500' : ''}`}
+                                />
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </ScrollArea>
+                </div>
+                <DialogFooter className="p-6 border-t bg-muted/20 gap-2">
+                  <Button variant="outline" onClick={() => setIsMassEditOpen(false)} className="gap-2">
+                    <X className="h-4 w-4" />
+                    Cancelar
+                  </Button>
+                  <Button onClick={saveMassChanges} className="gap-2">
+                    <Save className="h-4 w-4" />
+                    Guardar Todo
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
             
             <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
               <DialogTrigger asChild>
