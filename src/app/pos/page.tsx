@@ -1,6 +1,7 @@
+
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { AppLayout } from "@/components/layout/app-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,37 +14,71 @@ import {
   CreditCard, 
   Banknote,
   ShoppingBag,
-  User
+  User,
+  QrCode,
+  ArrowRightLeft,
+  CheckCircle2,
+  ChevronRight
 } from "lucide-react";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogFooter,
+  DialogTrigger
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { 
+  useCollection, 
+  useFirestore, 
+  useUser, 
+  useMemoFirebase,
+  addDocumentNonBlocking 
+} from "@/firebase";
+import { collection, serverTimestamp, doc } from "firebase/firestore";
 
-interface Product {
-  id: string;
-  name: string;
-  price: number;
-  stock: number;
-  category: string;
+interface CartItem {
+  product: any;
+  quantity: number;
 }
 
-const MOCK_PRODUCTS: Product[] = [
-  { id: "1", name: "Cerveza Quilmes 1L", price: 2500, stock: 45, category: "Bebidas" },
-  { id: "2", name: "Leche La Serenísima", price: 1200, stock: 20, category: "Lácteos" },
-  { id: "3", name: "Yerba Mate Playadito 1kg", price: 4200, stock: 15, category: "Almacén" },
-  { id: "4", name: "Pan Francés x kg", price: 1800, stock: 10, category: "Panadería" },
-  { id: "5", name: "Aceite Girasol 1.5L", price: 3100, stock: 8, category: "Almacén" },
-  { id: "6", name: "Gaseosa Coca Cola 2.25L", price: 2800, stock: 30, category: "Bebidas" },
-];
-
 export default function POSPage() {
-  const [cart, setCart] = useState<{ product: Product; quantity: number }[]>([]);
-  const [searchTerm, setSearchTerm] = useState("");
+  const { firestore } = useFirestore();
+  const { user } = useUser();
   const { toast } = useToast();
 
-  const filteredProducts = MOCK_PRODUCTS.filter(p => 
-    p.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // State
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
+  
+  // Payment Details State
+  const [paymentMethod, setPaymentMethod] = useState<string>("");
+  const [cashReceived, setCashReceived] = useState<number>(0);
+  const [cardType, setCardType] = useState<"Debito" | "Credito" | "">("");
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
 
-  const addToCart = (product: Product) => {
+  // Queries
+  const productsRef = useMemoFirebase(() => collection(firestore, "products"), [firestore]);
+  const customersRef = useMemoFirebase(() => collection(firestore, "customers"), [firestore]);
+  
+  const { data: products = [] } = useCollection(productsRef);
+  const { data: customers = [] } = useCollection(customersRef);
+
+  const filteredProducts = products?.filter(p => 
+    p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    p.sku?.toLowerCase().includes(searchTerm.toLowerCase())
+  ) || [];
+
+  const addToCart = (product: any) => {
     setCart(prev => {
       const existing = prev.find(item => item.product.id === product.id);
       if (existing) {
@@ -71,27 +106,90 @@ export default function POSPage() {
     }));
   };
 
-  const total = cart.reduce((acc, item) => acc + (item.product.price * item.quantity), 0);
+  const subtotal = cart.reduce((acc, item) => acc + (item.product.price * item.quantity), 0);
+  const total = subtotal; // Simplified for MVP
+  const changeDue = Math.max(0, cashReceived - total);
 
-  const handleCheckout = (method: string) => {
-    if (cart.length === 0) return;
-    toast({
-      title: "Venta Exitosa",
-      description: `Se ha registrado la venta por $${total.toLocaleString()} (${method}).`,
+  const resetPayment = () => {
+    setPaymentMethod("");
+    setCashReceived(0);
+    setCardType("");
+    setSelectedCustomerId("");
+  };
+
+  const handleCompleteSale = () => {
+    if (cart.length === 0 || !paymentMethod) return;
+    if (paymentMethod === "Efectivo" && cashReceived < total) {
+      toast({
+        variant: "destructive",
+        title: "Dinero insuficiente",
+        description: "El monto recibido es menor al total de la venta."
+      });
+      return;
+    }
+    if (paymentMethod === "Cuenta Corriente" && !selectedCustomerId) {
+      toast({
+        variant: "destructive",
+        title: "Falta Cliente",
+        description: "Debe seleccionar un cliente para ventas a cuenta corriente."
+      });
+      return;
+    }
+
+    const saleData = {
+      saleDateTime: serverTimestamp(),
+      totalAmount: total,
+      taxAmount: 0,
+      discountAmount: 0,
+      finalAmount: total,
+      paymentMethod: paymentMethod === "Tarjeta" ? `Tarjeta ${cardType}` : paymentMethod,
+      status: "Completed",
+      userId: user?.uid,
+      customerId: selectedCustomerId || null,
+      notes: paymentMethod === "Efectivo" ? `Recibido: $${cashReceived} - Vuelto: $${changeDue}` : "",
+      cashRegisterSessionId: "default-session" // En una app real esto vendría de la sesión abierta
+    };
+
+    const salesRef = collection(firestore, "sales");
+    addDocumentNonBlocking(salesRef, saleData).then((saleRef) => {
+      if (saleRef) {
+        // Guardar items de la venta
+        cart.forEach(item => {
+          const saleItemRef = collection(firestore, "sales", saleRef.id, "sale_items");
+          addDocumentNonBlocking(saleItemRef, {
+            saleId: saleRef.id,
+            productId: item.product.id,
+            productName: item.product.name,
+            quantity: item.quantity,
+            unitPrice: item.product.price,
+            discountPerItem: 0,
+            subtotal: item.product.price * item.quantity,
+            saleOwnerId: user?.uid // Denormalizado para seguridad
+          });
+        });
+      }
     });
+
+    toast({
+      title: "Venta Registrada",
+      description: `Venta por $${total.toLocaleString()} completada con éxito.`,
+    });
+
     setCart([]);
+    setIsPaymentDialogOpen(false);
+    resetPayment();
   };
 
   return (
     <AppLayout>
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[calc(100vh-120px)]">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[calc(100vh-140px)]">
         {/* Product Selection */}
         <div className="lg:col-span-7 flex flex-col space-y-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input 
-              placeholder="Buscar productos (nombre o código)..." 
-              className="pl-10"
+              placeholder="Buscar productos (nombre o SKU)..." 
+              className="pl-10 h-12 text-lg"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -101,16 +199,16 @@ export default function POSPage() {
             {filteredProducts.map(product => (
               <Card 
                 key={product.id} 
-                className="cursor-pointer hover:border-accent hover:shadow-md transition-all border-2"
+                className="cursor-pointer hover:border-accent hover:shadow-md transition-all border-2 active:scale-95"
                 onClick={() => addToCart(product)}
               >
                 <CardContent className="p-4 flex flex-col justify-between h-full space-y-2">
-                  <div className="text-xs text-muted-foreground">{product.category}</div>
-                  <div className="font-semibold text-sm line-clamp-2">{product.name}</div>
+                  <div className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">{product.category}</div>
+                  <div className="font-semibold text-sm line-clamp-2 min-h-[40px]">{product.name}</div>
                   <div className="flex justify-between items-center pt-2">
-                    <span className="text-accent font-bold">${product.price.toLocaleString()}</span>
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded ${product.stock < 10 ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
-                      Stock: {product.stock}
+                    <span className="text-primary font-bold text-lg">${product.price.toLocaleString()}</span>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${product.stockQuantity < 10 ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
+                      Stock: {product.stockQuantity}
                     </span>
                   </div>
                 </CardContent>
@@ -120,117 +218,207 @@ export default function POSPage() {
         </div>
 
         {/* Shopping Cart */}
-        <Card className="lg:col-span-5 flex flex-col shadow-xl">
-          <CardHeader className="pb-2 border-b">
+        <Card className="lg:col-span-5 flex flex-col shadow-xl overflow-hidden border-2">
+          <CardHeader className="pb-2 border-b bg-muted/20">
             <div className="flex justify-between items-center">
               <CardTitle className="text-lg flex items-center gap-2">
-                <ShoppingBag className="h-5 w-5 text-accent" />
-                Carrito de Compra
+                <ShoppingBag className="h-5 w-5 text-primary" />
+                Pedido Actual
               </CardTitle>
-              <Button variant="ghost" size="sm" onClick={() => setCart([])} className="text-muted-foreground h-8 px-2">
-                Limpiar
+              <Button variant="ghost" size="sm" onClick={() => setCart([])} className="text-muted-foreground h-8 px-2 hover:bg-red-50 hover:text-red-500">
+                Limpiar Todo
               </Button>
             </div>
           </CardHeader>
           <CardContent className="flex-1 overflow-y-auto p-0">
             {cart.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-8 text-center space-y-4">
-                <ShoppingBag className="h-12 w-12 opacity-20" />
-                <p>El carrito está vacío. Seleccione productos para comenzar.</p>
+                <div className="h-16 w-16 bg-muted rounded-full flex items-center justify-center">
+                  <ShoppingBag className="h-8 w-8 opacity-20" />
+                </div>
+                <p className="text-sm font-medium">No hay productos en el carrito.<br/>Empiece seleccionando algo del panel izquierdo.</p>
               </div>
             ) : (
-              <table className="w-full text-sm">
-                <thead className="sticky top-0 bg-background border-b z-10">
-                  <tr className="text-left text-muted-foreground">
-                    <th className="p-4 font-medium">Producto</th>
-                    <th className="p-4 font-medium">Cant.</th>
-                    <th className="p-4 font-medium text-right">Subtotal</th>
-                    <th className="p-4 w-10"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {cart.map((item) => (
-                    <tr key={item.product.id}>
-                      <td className="p-4 align-top">
-                        <div className="font-medium">{item.product.name}</div>
-                        <div className="text-xs text-muted-foreground">${item.product.price.toLocaleString()} c/u</div>
-                      </td>
-                      <td className="p-4 align-top">
-                        <div className="flex items-center gap-2">
-                          <Button 
-                            variant="outline" 
-                            size="icon" 
-                            className="h-6 w-6 rounded-full"
-                            onClick={() => updateQuantity(item.product.id, -1)}
-                          >
-                            <Minus className="h-3 w-3" />
-                          </Button>
-                          <span className="w-6 text-center">{item.quantity}</span>
-                          <Button 
-                            variant="outline" 
-                            size="icon" 
-                            className="h-6 w-6 rounded-full"
-                            onClick={() => updateQuantity(item.product.id, 1)}
-                          >
-                            <Plus className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </td>
-                      <td className="p-4 align-top text-right font-medium">
-                        ${(item.product.price * item.quantity).toLocaleString()}
-                      </td>
-                      <td className="p-4 align-top">
+              <div className="divide-y">
+                {cart.map((item) => (
+                  <div key={item.product.id} className="p-4 flex gap-4 items-start group">
+                    <div className="flex-1 space-y-1">
+                      <div className="font-medium text-sm leading-tight">{item.product.name}</div>
+                      <div className="text-xs text-muted-foreground">${item.product.price.toLocaleString()} c/u</div>
+                    </div>
+                    <div className="flex flex-col items-end gap-2">
+                      <div className="flex items-center gap-3 bg-muted/50 rounded-full p-1">
                         <Button 
                           variant="ghost" 
                           size="icon" 
-                          className="h-6 w-6 text-red-400 hover:text-red-600"
+                          className="h-7 w-7 rounded-full bg-background border shadow-sm"
+                          onClick={() => updateQuantity(item.product.id, -1)}
+                        >
+                          <Minus className="h-3.5 w-3.5" />
+                        </Button>
+                        <span className="w-4 text-center font-bold">{item.quantity}</span>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-7 w-7 rounded-full bg-background border shadow-sm"
+                          onClick={() => addToCart(item.product.id)} // This addToCart expects product object, fix:
+                          onClickCapture={(e) => { e.stopPropagation(); addToCart(item.product); }}
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-sm">${(item.product.price * item.quantity).toLocaleString()}</span>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-7 w-7 text-muted-foreground hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
                           onClick={() => removeFromCart(item.product.id)}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
           </CardContent>
-          <CardFooter className="flex-col p-6 border-t bg-muted/30">
-            <div className="w-full space-y-4">
-              <div className="flex justify-between items-center text-lg font-bold">
-                <span>Total</span>
-                <span className="text-primary">${total.toLocaleString()}</span>
-              </div>
-              
-              <div className="grid grid-cols-3 gap-2">
-                <Button 
-                  className="flex flex-col h-16 gap-1" 
-                  disabled={cart.length === 0}
-                  onClick={() => handleCheckout("Efectivo")}
-                >
-                  <Banknote className="h-5 w-5" />
-                  <span className="text-[10px]">Efectivo</span>
-                </Button>
-                <Button 
-                  variant="secondary" 
-                  className="flex flex-col h-16 gap-1" 
-                  disabled={cart.length === 0}
-                  onClick={() => handleCheckout("Tarjeta")}
-                >
-                  <CreditCard className="h-5 w-5" />
-                  <span className="text-[10px]">Tarjeta</span>
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="flex flex-col h-16 gap-1" 
-                  disabled={cart.length === 0}
-                  onClick={() => handleCheckout("Cuenta Corriente")}
-                >
-                  <User className="h-5 w-5" />
-                  <span className="text-[10px]">A Cuenta</span>
-                </Button>
-              </div>
+          <CardFooter className="flex-col p-6 border-t bg-muted/30 gap-4">
+            <div className="w-full flex justify-between items-center">
+              <span className="text-muted-foreground font-medium">Subtotal</span>
+              <span className="font-semibold">${subtotal.toLocaleString()}</span>
             </div>
+            <div className="w-full flex justify-between items-center text-2xl font-black">
+              <span>TOTAL</span>
+              <span className="text-primary">${total.toLocaleString()}</span>
+            </div>
+            
+            <Dialog open={isPaymentDialogOpen} onOpenChange={(open) => { setIsPaymentDialogOpen(open); if(!open) resetPayment(); }}>
+              <DialogTrigger asChild>
+                <Button className="w-full h-14 text-lg font-bold gap-2 shadow-lg" disabled={cart.length === 0}>
+                  Cobrar Venta
+                  <ChevronRight className="h-5 w-5" />
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[500px]">
+                <DialogHeader>
+                  <DialogTitle className="text-2xl font-bold flex items-center gap-2">
+                    Finalizar Venta - ${total.toLocaleString()}
+                  </DialogTitle>
+                </DialogHeader>
+
+                <div className="space-y-6 py-4">
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { id: "Efectivo", icon: Banknote, label: "Efectivo" },
+                      { id: "Tarjeta", icon: CreditCard, label: "Tarjeta" },
+                      { id: "QR", icon: QrCode, label: "QR / Transfer" },
+                      { id: "Cuenta Corriente", icon: User, label: "Fiado / A Cta" },
+                    ].map((method) => (
+                      <Button
+                        key={method.id}
+                        variant={paymentMethod === method.id ? "default" : "outline"}
+                        className={`flex flex-col h-20 gap-2 border-2 ${paymentMethod === method.id ? 'border-primary' : ''}`}
+                        onClick={() => { resetPayment(); setPaymentMethod(method.id); }}
+                      >
+                        <method.icon className="h-6 w-6" />
+                        <span className="text-[10px] font-bold uppercase">{method.label}</span>
+                      </Button>
+                    ))}
+                  </div>
+
+                  {paymentMethod === "Efectivo" && (
+                    <div className="space-y-4 p-4 bg-muted/30 rounded-lg border-2 border-dashed">
+                      <div className="space-y-2">
+                        <label className="text-sm font-bold">Monto Recibido</label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-muted-foreground">$</span>
+                          <Input 
+                            type="number" 
+                            className="pl-8 text-2xl font-bold h-14"
+                            placeholder="0.00"
+                            autoFocus
+                            value={cashReceived || ""}
+                            onChange={(e) => setCashReceived(Number(e.target.value))}
+                          />
+                        </div>
+                      </div>
+                      <div className="flex justify-between items-center p-4 bg-background rounded-md border">
+                        <span className="text-lg font-medium">Vuelto:</span>
+                        <span className={`text-3xl font-black ${changeDue > 0 ? 'text-accent' : 'text-muted-foreground'}`}>
+                          ${changeDue.toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {paymentMethod === "Tarjeta" && (
+                    <div className="grid grid-cols-2 gap-4">
+                      <Button 
+                        variant={cardType === "Debito" ? "default" : "outline"}
+                        className="h-16 text-lg font-bold border-2"
+                        onClick={() => setCardType("Debito")}
+                      >
+                        Débito
+                      </Button>
+                      <Button 
+                        variant={cardType === "Credito" ? "default" : "outline"}
+                        className="h-16 text-lg font-bold border-2"
+                        onClick={() => setCardType("Credito")}
+                      >
+                        Crédito
+                      </Button>
+                    </div>
+                  )}
+
+                  {paymentMethod === "Cuenta Corriente" && (
+                    <div className="space-y-2">
+                      <label className="text-sm font-bold">Seleccionar Cliente</label>
+                      <Select value={selectedCustomerId} onValueChange={setSelectedCustomerId}>
+                        <SelectTrigger className="h-12">
+                          <SelectValue placeholder="Buscar cliente..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {customers.map(customer => (
+                            <SelectItem key={customer.id} value={customer.id}>
+                              {customer.name} (Saldo: ${customer.currentBalance?.toLocaleString()})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground italic">La deuda se sumará automáticamente al perfil del cliente.</p>
+                    </div>
+                  )}
+
+                  {(paymentMethod === "QR") && (
+                    <div className="flex flex-col items-center justify-center p-8 bg-muted/20 rounded-lg border-2 border-dashed space-y-4">
+                      <QrCode className="h-20 w-20 text-primary opacity-50" />
+                      <p className="text-sm font-medium text-center">Escanee el código QR en la terminal de pago o confirme la recepción de la transferencia.</p>
+                    </div>
+                  )}
+                </div>
+
+                <DialogFooter className="sm:justify-between gap-4 mt-4">
+                  <Button variant="outline" onClick={() => setIsPaymentDialogOpen(false)} className="flex-1">
+                    Cancelar
+                  </Button>
+                  <Button 
+                    className="flex-1 h-12 text-lg font-bold gap-2"
+                    disabled={
+                      !paymentMethod || 
+                      (paymentMethod === "Efectivo" && cashReceived < total) ||
+                      (paymentMethod === "Tarjeta" && !cardType) ||
+                      (paymentMethod === "Cuenta Corriente" && !selectedCustomerId)
+                    }
+                    onClick={handleCompleteSale}
+                  >
+                    <CheckCircle2 className="h-5 w-5" />
+                    Confirmar Pago
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </CardFooter>
         </Card>
       </div>
