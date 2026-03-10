@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { AppLayout } from "@/components/layout/app-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,7 +16,6 @@ import {
   ShoppingBag,
   User,
   QrCode,
-  ArrowRightLeft,
   CheckCircle2,
   ChevronRight
 } from "lucide-react";
@@ -43,7 +42,7 @@ import {
   useMemoFirebase,
   addDocumentNonBlocking 
 } from "@/firebase";
-import { collection, serverTimestamp, doc } from "firebase/firestore";
+import { collection, serverTimestamp } from "firebase/firestore";
 
 interface CartItem {
   product: any;
@@ -51,22 +50,23 @@ interface CartItem {
 }
 
 export default function POSPage() {
-  const { firestore } = useFirestore();
+  // Hooks de Firebase corregidos
+  const firestore = useFirestore();
   const { user } = useUser();
   const { toast } = useToast();
 
-  // State
+  // Estado del Carrito y Buscador
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   
-  // Payment Details State
+  // Estado de Detalles de Pago
   const [paymentMethod, setPaymentMethod] = useState<string>("");
   const [cashReceived, setCashReceived] = useState<number>(0);
   const [cardType, setCardType] = useState<"Debito" | "Credito" | "">("");
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
 
-  // Queries
+  // Referencias a Firestore memoizadas
   const productsRef = useMemoFirebase(() => collection(firestore, "products"), [firestore]);
   const customersRef = useMemoFirebase(() => collection(firestore, "customers"), [firestore]);
   
@@ -75,7 +75,7 @@ export default function POSPage() {
 
   const filteredProducts = products?.filter(p => 
     p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.sku?.toLowerCase().includes(searchTerm.toLowerCase())
+    (p.sku && p.sku.toLowerCase().includes(searchTerm.toLowerCase()))
   ) || [];
 
   const addToCart = (product: any) => {
@@ -107,7 +107,7 @@ export default function POSPage() {
   };
 
   const subtotal = cart.reduce((acc, item) => acc + (item.product.price * item.quantity), 0);
-  const total = subtotal; // Simplified for MVP
+  const total = subtotal;
   const changeDue = Math.max(0, cashReceived - total);
 
   const resetPayment = () => {
@@ -119,6 +119,7 @@ export default function POSPage() {
 
   const handleCompleteSale = () => {
     if (cart.length === 0 || !paymentMethod) return;
+    
     if (paymentMethod === "Efectivo" && cashReceived < total) {
       toast({
         variant: "destructive",
@@ -127,6 +128,7 @@ export default function POSPage() {
       });
       return;
     }
+
     if (paymentMethod === "Cuenta Corriente" && !selectedCustomerId) {
       toast({
         variant: "destructive",
@@ -144,19 +146,18 @@ export default function POSPage() {
       finalAmount: total,
       paymentMethod: paymentMethod === "Tarjeta" ? `Tarjeta ${cardType}` : paymentMethod,
       status: "Completed",
-      userId: user?.uid,
+      userId: user?.uid || "anonymous",
       customerId: selectedCustomerId || null,
       notes: paymentMethod === "Efectivo" ? `Recibido: $${cashReceived} - Vuelto: $${changeDue}` : "",
-      cashRegisterSessionId: "default-session" // En una app real esto vendría de la sesión abierta
+      cashRegisterSessionId: "default-session"
     };
 
     const salesRef = collection(firestore, "sales");
     addDocumentNonBlocking(salesRef, saleData).then((saleRef) => {
       if (saleRef) {
-        // Guardar items de la venta
         cart.forEach(item => {
-          const saleItemRef = collection(firestore, "sales", saleRef.id, "sale_items");
-          addDocumentNonBlocking(saleItemRef, {
+          const saleItemsRef = collection(firestore, "sales", saleRef.id, "sale_items");
+          addDocumentNonBlocking(saleItemsRef, {
             saleId: saleRef.id,
             productId: item.product.id,
             productName: item.product.name,
@@ -164,7 +165,7 @@ export default function POSPage() {
             unitPrice: item.product.price,
             discountPerItem: 0,
             subtotal: item.product.price * item.quantity,
-            saleOwnerId: user?.uid // Denormalizado para seguridad
+            saleOwnerId: user?.uid || "anonymous"
           });
         });
       }
@@ -183,7 +184,7 @@ export default function POSPage() {
   return (
     <AppLayout>
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[calc(100vh-140px)]">
-        {/* Product Selection */}
+        {/* Panel Izquierdo: Productos */}
         <div className="lg:col-span-7 flex flex-col space-y-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -208,7 +209,7 @@ export default function POSPage() {
                   <div className="flex justify-between items-center pt-2">
                     <span className="text-primary font-bold text-lg">${product.price.toLocaleString()}</span>
                     <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${product.stockQuantity < 10 ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
-                      Stock: {product.stockQuantity}
+                      {product.stockQuantity} u.
                     </span>
                   </div>
                 </CardContent>
@@ -217,7 +218,7 @@ export default function POSPage() {
           </div>
         </div>
 
-        {/* Shopping Cart */}
+        {/* Panel Derecho: Carrito */}
         <Card className="lg:col-span-5 flex flex-col shadow-xl overflow-hidden border-2">
           <CardHeader className="pb-2 border-b bg-muted/20">
             <div className="flex justify-between items-center">
@@ -226,17 +227,15 @@ export default function POSPage() {
                 Pedido Actual
               </CardTitle>
               <Button variant="ghost" size="sm" onClick={() => setCart([])} className="text-muted-foreground h-8 px-2 hover:bg-red-50 hover:text-red-500">
-                Limpiar Todo
+                Limpiar
               </Button>
             </div>
           </CardHeader>
           <CardContent className="flex-1 overflow-y-auto p-0">
             {cart.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-8 text-center space-y-4">
-                <div className="h-16 w-16 bg-muted rounded-full flex items-center justify-center">
-                  <ShoppingBag className="h-8 w-8 opacity-20" />
-                </div>
-                <p className="text-sm font-medium">No hay productos en el carrito.<br/>Empiece seleccionando algo del panel izquierdo.</p>
+                <ShoppingBag className="h-12 w-12 opacity-10" />
+                <p className="text-sm font-medium">No hay productos en el carrito.</p>
               </div>
             ) : (
               <div className="divide-y">
@@ -251,7 +250,7 @@ export default function POSPage() {
                         <Button 
                           variant="ghost" 
                           size="icon" 
-                          className="h-7 w-7 rounded-full bg-background border shadow-sm"
+                          className="h-7 w-7 rounded-full bg-background border"
                           onClick={() => updateQuantity(item.product.id, -1)}
                         >
                           <Minus className="h-3.5 w-3.5" />
@@ -260,9 +259,8 @@ export default function POSPage() {
                         <Button 
                           variant="ghost" 
                           size="icon" 
-                          className="h-7 w-7 rounded-full bg-background border shadow-sm"
-                          onClick={() => addToCart(item.product.id)} // This addToCart expects product object, fix:
-                          onClickCapture={(e) => { e.stopPropagation(); addToCart(item.product); }}
+                          className="h-7 w-7 rounded-full bg-background border"
+                          onClick={() => addToCart(item.product)}
                         >
                           <Plus className="h-3.5 w-3.5" />
                         </Button>
@@ -272,7 +270,7 @@ export default function POSPage() {
                         <Button 
                           variant="ghost" 
                           size="icon" 
-                          className="h-7 w-7 text-muted-foreground hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="h-7 w-7 text-muted-foreground hover:text-red-500"
                           onClick={() => removeFromCart(item.product.id)}
                         >
                           <Trash2 className="h-4 w-4" />
@@ -285,10 +283,6 @@ export default function POSPage() {
             )}
           </CardContent>
           <CardFooter className="flex-col p-6 border-t bg-muted/30 gap-4">
-            <div className="w-full flex justify-between items-center">
-              <span className="text-muted-foreground font-medium">Subtotal</span>
-              <span className="font-semibold">${subtotal.toLocaleString()}</span>
-            </div>
             <div className="w-full flex justify-between items-center text-2xl font-black">
               <span>TOTAL</span>
               <span className="text-primary">${total.toLocaleString()}</span>
@@ -296,30 +290,28 @@ export default function POSPage() {
             
             <Dialog open={isPaymentDialogOpen} onOpenChange={(open) => { setIsPaymentDialogOpen(open); if(!open) resetPayment(); }}>
               <DialogTrigger asChild>
-                <Button className="w-full h-14 text-lg font-bold gap-2 shadow-lg" disabled={cart.length === 0}>
+                <Button className="w-full h-14 text-lg font-bold gap-2" disabled={cart.length === 0}>
                   Cobrar Venta
                   <ChevronRight className="h-5 w-5" />
                 </Button>
               </DialogTrigger>
               <DialogContent className="sm:max-w-[500px]">
                 <DialogHeader>
-                  <DialogTitle className="text-2xl font-bold flex items-center gap-2">
-                    Finalizar Venta - ${total.toLocaleString()}
-                  </DialogTitle>
+                  <DialogTitle className="text-2xl font-bold">Total a Cobrar: ${total.toLocaleString()}</DialogTitle>
                 </DialogHeader>
 
                 <div className="space-y-6 py-4">
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-4 gap-2">
                     {[
                       { id: "Efectivo", icon: Banknote, label: "Efectivo" },
                       { id: "Tarjeta", icon: CreditCard, label: "Tarjeta" },
-                      { id: "QR", icon: QrCode, label: "QR / Transfer" },
-                      { id: "Cuenta Corriente", icon: User, label: "Fiado / A Cta" },
+                      { id: "QR", icon: QrCode, label: "QR / Trans" },
+                      { id: "Cuenta Corriente", icon: User, label: "Fiado" },
                     ].map((method) => (
                       <Button
                         key={method.id}
                         variant={paymentMethod === method.id ? "default" : "outline"}
-                        className={`flex flex-col h-20 gap-2 border-2 ${paymentMethod === method.id ? 'border-primary' : ''}`}
+                        className="flex flex-col h-20 gap-2 border-2"
                         onClick={() => { resetPayment(); setPaymentMethod(method.id); }}
                       >
                         <method.icon className="h-6 w-6" />
@@ -332,17 +324,14 @@ export default function POSPage() {
                     <div className="space-y-4 p-4 bg-muted/30 rounded-lg border-2 border-dashed">
                       <div className="space-y-2">
                         <label className="text-sm font-bold">Monto Recibido</label>
-                        <div className="relative">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-muted-foreground">$</span>
-                          <Input 
-                            type="number" 
-                            className="pl-8 text-2xl font-bold h-14"
-                            placeholder="0.00"
-                            autoFocus
-                            value={cashReceived || ""}
-                            onChange={(e) => setCashReceived(Number(e.target.value))}
-                          />
-                        </div>
+                        <Input 
+                          type="number" 
+                          className="text-2xl font-bold h-14"
+                          placeholder="0.00"
+                          autoFocus
+                          value={cashReceived || ""}
+                          onChange={(e) => setCashReceived(Number(e.target.value))}
+                        />
                       </div>
                       <div className="flex justify-between items-center p-4 bg-background rounded-md border">
                         <span className="text-lg font-medium">Vuelto:</span>
@@ -357,14 +346,14 @@ export default function POSPage() {
                     <div className="grid grid-cols-2 gap-4">
                       <Button 
                         variant={cardType === "Debito" ? "default" : "outline"}
-                        className="h-16 text-lg font-bold border-2"
+                        className="h-16 text-lg font-bold"
                         onClick={() => setCardType("Debito")}
                       >
                         Débito
                       </Button>
                       <Button 
                         variant={cardType === "Credito" ? "default" : "outline"}
-                        className="h-16 text-lg font-bold border-2"
+                        className="h-16 text-lg font-bold"
                         onClick={() => setCardType("Credito")}
                       >
                         Crédito
@@ -387,14 +376,6 @@ export default function POSPage() {
                           ))}
                         </SelectContent>
                       </Select>
-                      <p className="text-xs text-muted-foreground italic">La deuda se sumará automáticamente al perfil del cliente.</p>
-                    </div>
-                  )}
-
-                  {(paymentMethod === "QR") && (
-                    <div className="flex flex-col items-center justify-center p-8 bg-muted/20 rounded-lg border-2 border-dashed space-y-4">
-                      <QrCode className="h-20 w-20 text-primary opacity-50" />
-                      <p className="text-sm font-medium text-center">Escanee el código QR en la terminal de pago o confirme la recepción de la transferencia.</p>
                     </div>
                   )}
                 </div>
