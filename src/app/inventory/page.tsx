@@ -27,19 +27,39 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Search, Trash2, Download, Upload, Loader2, FileSpreadsheet, Image as ImageIcon } from "lucide-react";
+import { 
+  Plus, 
+  Search, 
+  Trash2, 
+  Upload, 
+  Loader2, 
+  FileSpreadsheet, 
+  LayoutGrid, 
+  List, 
+  Edit3, 
+  Package,
+  MoreVertical
+} from "lucide-react";
 import { 
   useFirestore, 
   useUser, 
   useMemoFirebase, 
   useCollection, 
   addDocumentNonBlocking, 
-  deleteDocumentNonBlocking 
+  deleteDocumentNonBlocking,
+  updateDocumentNonBlocking
 } from "@/firebase";
 import { collection, doc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import * as XLSX from 'xlsx';
-import Image from 'next/image';
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export default function InventoryPage() {
   const firestore = useFirestore();
@@ -48,17 +68,17 @@ export default function InventoryPage() {
   
   const [searchTerm, setSearchTerm] = useState("");
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<any>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>("");
+  const [viewMode, setViewMode] = useState<"grid" | "list">("list");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Referencia a productos del usuario
   const productsRef = useMemoFirebase(() => {
     if (!firestore || !user?.uid) return null;
     return collection(firestore, "users", user.uid, "products");
   }, [firestore, user?.uid]);
 
-  // Referencia a categorías del usuario para el selector
   const categoriesRef = useMemoFirebase(() => {
     if (!firestore || !user?.uid) return null;
     return collection(firestore, "users", user.uid, "categories");
@@ -75,39 +95,38 @@ export default function InventoryPage() {
     p.sku?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleAddProduct = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSaveProduct = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!user || !productsRef) {
-      toast({ variant: "destructive", title: "Error", description: "No se pudo conectar con la base de datos." });
-      return;
-    }
+    if (!user || !productsRef || !firestore) return;
 
     const formData = new FormData(e.currentTarget);
     const name = formData.get("name") as string;
     const price = Number(formData.get("price"));
     const stock = Number(formData.get("stock"));
-    const imageUrl = formData.get("imageUrl") as string || `https://picsum.photos/seed/${name}/200/200`;
+    const imageUrl = formData.get("imageUrl") as string || `https://picsum.photos/seed/${name}/400/300`;
 
-    if (!name || isNaN(price) || isNaN(stock)) {
-      toast({ variant: "destructive", title: "Campos inválidos", description: "Por favor complete los campos obligatorios." });
-      return;
-    }
-
-    const newProduct = {
+    const productData = {
       name,
       price,
       stockQuantity: stock,
       category: selectedCategory || "Sin Categoría",
       provider: formData.get("provider") as string || "",
-      sku: formData.get("sku") as string || `SKU-${Date.now()}`,
+      sku: formData.get("sku") as string || (editingProduct ? editingProduct.sku : `SKU-${Date.now()}`),
       imageUrl,
-      createdAt: new Date().toISOString()
+      updatedAt: new Date().toISOString()
     };
 
-    addDocumentNonBlocking(productsRef, newProduct);
-    toast({ title: "Producto Agregado", description: `${name} se ha guardado correctamente.` });
+    if (editingProduct) {
+      const docRef = doc(firestore, "users", user.uid, "products", editingProduct.id);
+      updateDocumentNonBlocking(docRef, productData);
+      toast({ title: "Producto Actualizado", description: `${name} se ha guardado correctamente.` });
+      setEditingProduct(null);
+    } else {
+      addDocumentNonBlocking(productsRef, { ...productData, createdAt: new Date().toISOString() });
+      toast({ title: "Producto Agregado", description: `${name} se ha guardado correctamente.` });
+      setIsAddOpen(false);
+    }
     
-    setIsAddOpen(false);
     setSelectedCategory("");
   };
 
@@ -137,12 +156,6 @@ export default function InventoryPage() {
         const ws = wb.Sheets[wsname];
         const data = XLSX.utils.sheet_to_json(ws);
 
-        if (data.length === 0) {
-          toast({ variant: "destructive", title: "Archivo vacío", description: "No se encontraron datos." });
-          setIsImporting(false);
-          return;
-        }
-
         data.forEach((row: any) => {
           const prodName = row.Nombre || row.name || row.Producto || "Producto Importado";
           const newProduct = {
@@ -152,7 +165,7 @@ export default function InventoryPage() {
             category: row.Categoría || row.category || "General",
             provider: row.Proveedor || row.provider || "",
             sku: row.SKU || row.sku || `SKU-${Math.random().toString(36).substr(2, 9)}`,
-            imageUrl: row.Imagen || row.imageUrl || `https://picsum.photos/seed/${prodName}/200/200`,
+            imageUrl: row.Imagen || row.imageUrl || `https://picsum.photos/seed/${prodName}/400/300`,
             createdAt: new Date().toISOString()
           };
           addDocumentNonBlocking(productsRef, newProduct);
@@ -176,10 +189,30 @@ export default function InventoryPage() {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold font-headline">Inventario</h1>
-            <p className="text-muted-foreground">Gestione sus productos y niveles de stock.</p>
+            <p className="text-muted-foreground">Gestione sus productos, precios y niveles de stock.</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <input type="file" ref={fileInputRef} className="hidden" accept=".xlsx, .xls" onChange={handleFileChange} />
+            
+            <div className="flex border rounded-md overflow-hidden bg-background mr-2 shadow-sm">
+              <Button 
+                variant={viewMode === 'list' ? 'secondary' : 'ghost'} 
+                size="icon" 
+                className="rounded-none h-10 w-10"
+                onClick={() => setViewMode('list')}
+              >
+                <List className="h-4 w-4" />
+              </Button>
+              <Button 
+                variant={viewMode === 'grid' ? 'secondary' : 'ghost'} 
+                size="icon" 
+                className="rounded-none h-10 w-10"
+                onClick={() => setViewMode('grid')}
+              >
+                <LayoutGrid className="h-4 w-4" />
+              </Button>
+            </div>
+
             <Button variant="outline" className="gap-2" onClick={handleImportClick} disabled={isImporting}>
               {isImporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
               Importar
@@ -193,58 +226,41 @@ export default function InventoryPage() {
                 </Button>
               </DialogTrigger>
               <DialogContent className="sm:max-w-[425px]">
-                <form onSubmit={handleAddProduct}>
+                <form onSubmit={handleSaveProduct}>
                   <DialogHeader>
                     <DialogTitle>Agregar Nuevo Producto</DialogTitle>
                   </DialogHeader>
-                  <div className="grid gap-4 py-4">
-                    <div className="grid gap-2">
-                      <label className="text-sm font-medium">Nombre del Producto *</label>
-                      <Input name="name" placeholder="Ej: Coca Cola 1.5L" required />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="grid gap-2">
-                        <label className="text-sm font-medium">Precio de Venta *</label>
-                        <Input name="price" type="number" step="0.01" placeholder="0.00" required />
-                      </div>
-                      <div className="grid gap-2">
-                        <label className="text-sm font-medium">Stock Inicial *</label>
-                        <Input name="stock" type="number" placeholder="0" required />
-                      </div>
-                    </div>
-                    <div className="grid gap-2">
-                      <label className="text-sm font-medium">Categoría</label>
-                      <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Seleccione una categoría" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {categories.length > 0 ? (
-                            categories.map((cat) => (
-                              <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
-                            ))
-                          ) : (
-                            <SelectItem value="none" disabled>No hay categorías creadas</SelectItem>
-                          )}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="grid gap-2">
-                      <label className="text-sm font-medium">URL de Imagen (Opcional)</label>
-                      <Input name="imageUrl" placeholder="https://ejemplo.com/imagen.jpg" />
-                    </div>
-                    <div className="grid gap-2">
-                      <label className="text-sm font-medium">Proveedor / SKU (Opcional)</label>
-                      <div className="grid grid-cols-2 gap-2">
-                        <Input name="provider" placeholder="Proveedor" />
-                        <Input name="sku" placeholder="SKU / Código" />
-                      </div>
-                    </div>
-                  </div>
+                  <ProductFormFields 
+                    categories={categories} 
+                    selectedCategory={selectedCategory} 
+                    setSelectedCategory={setSelectedCategory} 
+                  />
                   <DialogFooter>
                     <Button type="submit" className="w-full">Guardar Producto</Button>
                   </DialogFooter>
                 </form>
+              </DialogContent>
+            </Dialog>
+
+            {/* Dialog de Edición */}
+            <Dialog open={!!editingProduct} onOpenChange={(open) => !open && setEditingProduct(null)}>
+              <DialogContent className="sm:max-w-[425px]">
+                {editingProduct && (
+                  <form onSubmit={handleSaveProduct}>
+                    <DialogHeader>
+                      <DialogTitle>Editar Producto</DialogTitle>
+                    </DialogHeader>
+                    <ProductFormFields 
+                      product={editingProduct}
+                      categories={categories} 
+                      selectedCategory={selectedCategory || editingProduct.category} 
+                      setSelectedCategory={setSelectedCategory} 
+                    />
+                    <DialogFooter>
+                      <Button type="submit" className="w-full">Actualizar Producto</Button>
+                    </DialogFooter>
+                  </form>
+                )}
               </DialogContent>
             </Dialog>
           </div>
@@ -253,82 +269,184 @@ export default function InventoryPage() {
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input 
-            placeholder="Buscar por nombre o código..." 
-            className="pl-10 h-11" 
+            placeholder="Buscar por nombre o código SKU..." 
+            className="pl-10 h-11 text-base shadow-sm" 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
 
-        <div className="border rounded-lg overflow-hidden bg-card shadow-sm">
-          {isProductsLoading ? (
-            <div className="p-12 flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
-          ) : (
+        {isProductsLoading ? (
+          <div className="p-24 flex flex-col items-center justify-center gap-4">
+            <Loader2 className="h-10 w-10 animate-spin text-primary" />
+            <p className="text-muted-foreground animate-pulse">Cargando inventario...</p>
+          </div>
+        ) : filteredProducts.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-24 text-muted-foreground bg-card border rounded-xl border-dashed">
+            <Package className="h-16 w-16 opacity-10 mb-4" />
+            <p className="text-xl font-semibold">No hay productos que coincidan</p>
+            <p className="text-sm">Agregue un nuevo producto o intente otra búsqueda.</p>
+          </div>
+        ) : viewMode === 'list' ? (
+          <div className="border rounded-xl overflow-hidden bg-card shadow-sm">
             <Table>
-              <TableHeader className="bg-muted/50">
+              <TableHeader className="bg-muted/30">
                 <TableRow>
+                  <TableHead className="w-[80px]">Imagen</TableHead>
                   <TableHead>Producto</TableHead>
                   <TableHead>Categoría</TableHead>
                   <TableHead className="text-right">Precio</TableHead>
                   <TableHead className="text-right">Stock</TableHead>
-                  <TableHead className="text-right">Acciones</TableHead>
+                  <TableHead className="text-right w-[100px]">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredProducts.map((product) => (
-                  <TableRow key={product.id}>
+                  <TableRow key={product.id} className="group hover:bg-muted/20">
+                    <TableCell>
+                      <div className="relative h-12 w-12 rounded-lg overflow-hidden bg-muted border shadow-inner">
+                        <img 
+                          src={product.imageUrl || `https://picsum.photos/seed/${product.id}/100/100`} 
+                          alt={product.name}
+                          className="h-full w-full object-cover"
+                        />
+                      </div>
+                    </TableCell>
                     <TableCell className="font-medium">
-                      <div className="flex items-center gap-3">
-                        <div className="relative h-10 w-10 rounded-md overflow-hidden bg-muted flex-shrink-0 border">
-                          <img 
-                            src={product.imageUrl || `https://picsum.photos/seed/${product.id}/40/40`} 
-                            alt={product.name}
-                            className="h-full w-full object-cover"
-                            data-ai-hint="product photo"
-                          />
-                        </div>
-                        <div className="flex flex-col">
-                          <span>{product.name}</span>
-                          <span className="text-[10px] text-muted-foreground">{product.sku}</span>
-                        </div>
+                      <div className="flex flex-col">
+                        <span className="text-sm font-bold">{product.name}</span>
+                        <span className="text-[10px] text-muted-foreground font-mono">{product.sku}</span>
                       </div>
                     </TableCell>
                     <TableCell>
-                      <span className="text-xs bg-muted px-2 py-1 rounded-md text-muted-foreground">
+                      <Badge variant="outline" className="font-normal text-[10px] uppercase">
                         {product.category || "General"}
-                      </span>
+                      </Badge>
                     </TableCell>
-                    <TableCell className="text-right font-semibold">${product.price?.toLocaleString()}</TableCell>
+                    <TableCell className="text-right font-black text-primary">
+                      ${product.price?.toLocaleString()}
+                    </TableCell>
                     <TableCell className="text-right">
-                      <span className={`px-2 py-1 rounded-full text-[10px] font-bold ${
+                      <span className={`px-2 py-1 rounded-full text-[11px] font-bold ${
                         (product.stockQuantity || 0) <= 5 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
                       }`}>
                         {product.stockQuantity || 0} u.
                       </span>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDelete(product.id)}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem className="gap-2" onClick={() => {
+                            setEditingProduct(product);
+                            setSelectedCategory(product.category);
+                          }}>
+                            <Edit3 className="h-4 w-4 text-blue-500" />
+                            Editar
+                          </DropdownMenuItem>
+                          <DropdownMenuItem className="gap-2 text-destructive" onClick={() => handleDelete(product.id)}>
+                            <Trash2 className="h-4 w-4" />
+                            Eliminar
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </TableCell>
                   </TableRow>
                 ))}
-                {filteredProducts.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-center py-24 text-muted-foreground">
-                      <div className="flex flex-col items-center gap-2">
-                        <FileSpreadsheet className="h-10 w-10 opacity-20" />
-                        <p className="text-lg font-medium">No se encontraron productos</p>
-                        <p className="text-sm">Agrega uno nuevo o importa desde Excel.</p>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                )}
               </TableBody>
             </Table>
-          )}
-        </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+            {filteredProducts.map((product) => (
+              <Card key={product.id} className="overflow-hidden hover:shadow-xl transition-all border-2 group">
+                <div className="relative aspect-video w-full overflow-hidden bg-muted border-b">
+                  <img 
+                    src={product.imageUrl || `https://picsum.photos/seed/${product.id}/400/300`} 
+                    alt={product.name}
+                    className="h-full w-full object-cover transition-transform group-hover:scale-105"
+                  />
+                  <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">
+                    <Badge className={product.stockQuantity <= 5 ? 'bg-red-500' : 'bg-primary'}>
+                      {product.stockQuantity} unid.
+                    </Badge>
+                  </div>
+                </div>
+                <CardContent className="p-4 space-y-2">
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{product.category}</span>
+                  <h3 className="font-bold text-sm line-clamp-2 h-10">{product.name}</h3>
+                  <div className="text-xl font-black text-primary">${product.price?.toLocaleString()}</div>
+                </CardContent>
+                <CardFooter className="p-3 bg-muted/20 border-t flex justify-between gap-2">
+                  <Button variant="outline" size="sm" className="flex-1 gap-2" onClick={() => {
+                    setEditingProduct(product);
+                    setSelectedCategory(product.category);
+                  }}>
+                    <Edit3 className="h-3.5 w-3.5" />
+                    Editar
+                  </Button>
+                  <Button variant="outline" size="icon" className="text-destructive h-9 w-9" onClick={() => handleDelete(product.id)}>
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </CardFooter>
+              </Card>
+            ))}
+          </div>
+        )}
       </div>
     </AppLayout>
+  );
+}
+
+function ProductFormFields({ product, categories, selectedCategory, setSelectedCategory }: any) {
+  return (
+    <div className="grid gap-4 py-4">
+      <div className="grid gap-2">
+        <label className="text-sm font-medium">Nombre del Producto *</label>
+        <Input name="name" defaultValue={product?.name} placeholder="Ej: Coca Cola 1.5L" required />
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div className="grid gap-2">
+          <label className="text-sm font-medium">Precio de Venta *</label>
+          <Input name="price" type="number" step="0.01" defaultValue={product?.price} placeholder="0.00" required />
+        </div>
+        <div className="grid gap-2">
+          <label className="text-sm font-medium">Stock Inicial *</label>
+          <Input name="stock" type="number" defaultValue={product?.stockQuantity} placeholder="0" required />
+        </div>
+      </div>
+      <div className="grid gap-2">
+        <label className="text-sm font-medium">Categoría</label>
+        <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+          <SelectTrigger>
+            <SelectValue placeholder="Seleccione una categoría" />
+          </SelectTrigger>
+          <SelectContent>
+            {categories.length > 0 ? (
+              categories.map((cat: any) => (
+                <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
+              ))
+            ) : (
+              <SelectItem value="none" disabled>No hay categorías creadas</SelectItem>
+            )}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="grid gap-2">
+        <label className="text-sm font-medium">URL de Imagen (Opcional)</label>
+        <Input name="imageUrl" defaultValue={product?.imageUrl} placeholder="https://ejemplo.com/imagen.jpg" />
+      </div>
+      <div className="grid gap-2">
+        <label className="text-sm font-medium">Proveedor / SKU (Opcional)</label>
+        <div className="grid grid-cols-2 gap-2">
+          <Input name="provider" defaultValue={product?.provider} placeholder="Proveedor" />
+          <Input name="sku" defaultValue={product?.sku} placeholder="SKU / Código" />
+        </div>
+      </div>
+    </div>
   );
 }
