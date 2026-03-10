@@ -28,7 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Search, Trash2, Download, Upload, Loader2, FileSpreadsheet } from "lucide-react";
+import { Plus, Search, Trash2, Download, Upload, Loader2, FileSpreadsheet, Image as ImageIcon } from "lucide-react";
 import { 
   useFirestore, 
   useUser, 
@@ -40,10 +40,11 @@ import {
 import { collection, doc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import * as XLSX from 'xlsx';
+import Image from 'next/image';
 
 export default function InventoryPage() {
   const firestore = useFirestore();
-  const { user } = userHook();
+  const { user } = useUser();
   const { toast } = useToast();
   
   const [searchTerm, setSearchTerm] = useState("");
@@ -51,10 +52,6 @@ export default function InventoryPage() {
   const [isImporting, setIsImporting] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  function userHook() {
-    return useUser();
-  }
 
   // Referencia a productos del usuario
   const productsRef = useMemoFirebase(() => {
@@ -68,11 +65,8 @@ export default function InventoryPage() {
     return collection(firestore, "users", user.uid, "categories");
   }, [firestore, user?.uid]);
 
-  const { data: productsData, isLoading: isProductsLoading } = useCollection(productsRef);
-  const { data: categoriesData } = useCollection(categoriesRef);
-
-  const products = productsData || [];
-  const categories = categoriesData || [];
+  const { data: products = [], isLoading: isProductsLoading } = useCollection(productsRef);
+  const { data: categories = [] } = useCollection(categoriesRef);
 
   const filteredProducts = products.filter(p => 
     p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -90,6 +84,7 @@ export default function InventoryPage() {
     const name = formData.get("name") as string;
     const price = Number(formData.get("price"));
     const stock = Number(formData.get("stock"));
+    const imageUrl = formData.get("imageUrl") as string || `https://picsum.photos/seed/${name}/200/200`;
 
     if (!name || isNaN(price) || isNaN(stock)) {
       toast({ variant: "destructive", title: "Campos inválidos", description: "Por favor complete los campos obligatorios." });
@@ -103,13 +98,13 @@ export default function InventoryPage() {
       category: selectedCategory || "Sin Categoría",
       provider: formData.get("provider") as string || "",
       sku: formData.get("sku") as string || `SKU-${Date.now()}`,
+      imageUrl,
       createdAt: new Date().toISOString()
     };
 
     addDocumentNonBlocking(productsRef, newProduct);
     toast({ title: "Producto Agregado", description: `${name} se ha guardado correctamente.` });
     
-    // Reset y cerrar
     setIsAddOpen(false);
     setSelectedCategory("");
   };
@@ -147,13 +142,15 @@ export default function InventoryPage() {
         }
 
         data.forEach((row: any) => {
+          const prodName = row.Nombre || row.name || row.Producto || "Producto Importado";
           const newProduct = {
-            name: row.Nombre || row.name || row.Producto || "Producto Importado",
+            name: prodName,
             price: Number(row.Precio || row.price || 0),
             stockQuantity: Number(row.Stock || row.stockQuantity || 0),
             category: row.Categoría || row.category || "General",
             provider: row.Proveedor || row.provider || "",
             sku: row.SKU || row.sku || `SKU-${Math.random().toString(36).substr(2, 9)}`,
+            imageUrl: row.Imagen || row.imageUrl || `https://picsum.photos/seed/${prodName}/200/200`,
             createdAt: new Date().toISOString()
           };
           addDocumentNonBlocking(productsRef, newProduct);
@@ -171,15 +168,6 @@ export default function InventoryPage() {
     reader.readAsBinaryString(file);
   };
 
-  const downloadTemplate = () => {
-    const ws = XLSX.utils.json_to_sheet([
-      { Nombre: "Arroz 1kg", Precio: 1500, Stock: 50, Categoría: "Almacén", SKU: "ARR001", Proveedor: "Molinos S.A." }
-    ]);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Productos");
-    XLSX.writeFile(wb, "vendixpro_plantilla.xlsx");
-  };
-
   return (
     <AppLayout>
       <div className="space-y-6">
@@ -193,10 +181,6 @@ export default function InventoryPage() {
             <Button variant="outline" className="gap-2" onClick={handleImportClick} disabled={isImporting}>
               {isImporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
               Importar
-            </Button>
-            <Button variant="ghost" className="h-10 text-xs" onClick={downloadTemplate}>
-              <Download className="h-3 w-3 mr-1" />
-              Plantilla
             </Button>
             
             <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
@@ -244,6 +228,10 @@ export default function InventoryPage() {
                       </Select>
                     </div>
                     <div className="grid gap-2">
+                      <label className="text-sm font-medium">URL de Imagen (Opcional)</label>
+                      <Input name="imageUrl" placeholder="https://ejemplo.com/imagen.jpg" />
+                    </div>
+                    <div className="grid gap-2">
                       <label className="text-sm font-medium">Proveedor / SKU (Opcional)</label>
                       <div className="grid grid-cols-2 gap-2">
                         <Input name="provider" placeholder="Proveedor" />
@@ -288,9 +276,19 @@ export default function InventoryPage() {
                 {filteredProducts.map((product) => (
                   <TableRow key={product.id}>
                     <TableCell className="font-medium">
-                      <div className="flex flex-col">
-                        <span>{product.name}</span>
-                        <span className="text-[10px] text-muted-foreground">{product.sku}</span>
+                      <div className="flex items-center gap-3">
+                        <div className="relative h-10 w-10 rounded-md overflow-hidden bg-muted flex-shrink-0 border">
+                          <img 
+                            src={product.imageUrl || `https://picsum.photos/seed/${product.id}/40/40`} 
+                            alt={product.name}
+                            className="h-full w-full object-cover"
+                            data-ai-hint="product photo"
+                          />
+                        </div>
+                        <div className="flex flex-col">
+                          <span>{product.name}</span>
+                          <span className="text-[10px] text-muted-foreground">{product.sku}</span>
+                        </div>
                       </div>
                     </TableCell>
                     <TableCell>

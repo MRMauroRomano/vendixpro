@@ -1,8 +1,9 @@
+
 "use client";
 
 import { useState } from "react";
 import { AppLayout } from "@/components/layout/app-layout";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/button"; 
 import { 
   Table, 
   TableBody, 
@@ -28,7 +29,7 @@ export default function LowStockPage() {
   const { data: products = [], isLoading } = useCollection(productsRef);
 
   // Filtramos productos con stock <= 5
-  const lowStockProducts = products?.filter(p => (p.stockQuantity || 0) <= 5) || [];
+  const lowStockProducts = products.filter(p => (p.stockQuantity || 0) <= 5);
 
   return (
     <AppLayout>
@@ -73,7 +74,18 @@ export default function LowStockPage() {
               <TableBody>
                 {lowStockProducts.map((product) => (
                   <TableRow key={product.id}>
-                    <TableCell className="font-medium">{product.name}</TableCell>
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded overflow-hidden bg-muted border flex-shrink-0">
+                          <img 
+                            src={product.imageUrl || `https://picsum.photos/seed/${product.id}/40/40`} 
+                            alt={product.name}
+                            className="h-full w-full object-cover"
+                          />
+                        </div>
+                        {product.name}
+                      </div>
+                    </TableCell>
                     <TableCell>
                       <span className="text-xs bg-muted px-2 py-1 rounded-md text-muted-foreground uppercase">
                         {product.category || "General"}

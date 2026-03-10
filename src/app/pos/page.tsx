@@ -17,7 +17,8 @@ import {
   User,
   QrCode,
   CheckCircle2,
-  ChevronRight
+  ChevronRight,
+  Package
 } from "lucide-react";
 import { 
   Dialog, 
@@ -63,7 +64,6 @@ export default function POSPage() {
   const [cardType, setCardType] = useState<"Debito" | "Credito" | "">("");
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
 
-  // Rutas de Firestore aisladas por usuario
   const productsRef = useMemoFirebase(() => {
     if (!firestore || !user?.uid) return null;
     return collection(firestore, "users", user.uid, "products");
@@ -74,11 +74,8 @@ export default function POSPage() {
     return collection(firestore, "users", user.uid, "customers");
   }, [firestore, user?.uid]);
   
-  const { data: productsData } = useCollection(productsRef);
-  const { data: customersData } = useCollection(customersRef);
-
-  const products = productsData || [];
-  const customers = customersData || [];
+  const { data: products = [] } = useCollection(productsRef);
+  const { data: customers = [] } = useCollection(customersRef);
 
   const filteredProducts = products.filter(p => 
     p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -156,6 +153,7 @@ export default function POSPage() {
       userId: user.uid,
       customerId: selectedCustomerId || null,
       notes: paymentMethod === "Efectivo" ? `Recibido: $${cashReceived} - Vuelto: $${changeDue}` : "",
+      createdAt: new Date().toISOString()
     };
 
     const salesRef = collection(firestore, "users", user.uid, "sales");
@@ -203,26 +201,29 @@ export default function POSPage() {
             {filteredProducts.map(product => (
               <Card 
                 key={product.id} 
-                className="cursor-pointer hover:border-accent hover:shadow-md transition-all border-2 active:scale-95"
+                className="cursor-pointer hover:border-accent hover:shadow-md transition-all border-2 active:scale-95 group overflow-hidden"
                 onClick={() => addToCart(product)}
               >
-                <CardContent className="p-4 flex flex-col justify-between h-full space-y-2">
-                  <div className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">{product.category}</div>
-                  <div className="font-semibold text-sm line-clamp-2 min-h-[40px]">{product.name}</div>
-                  <div className="flex justify-between items-center pt-2">
-                    <span className="text-primary font-bold text-lg">${product.price.toLocaleString()}</span>
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${product.stockQuantity < 10 ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
+                <div className="relative h-32 w-full overflow-hidden bg-muted border-b">
+                   <img 
+                    src={product.imageUrl || `https://picsum.photos/seed/${product.id}/300/200`} 
+                    alt={product.name}
+                    className="h-full w-full object-cover transition-transform group-hover:scale-110"
+                    data-ai-hint="product image"
+                  />
+                  <div className="absolute top-2 right-2">
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold shadow-sm ${product.stockQuantity < 10 ? 'bg-red-500 text-white' : 'bg-green-500 text-white'}`}>
                       {product.stockQuantity} u.
                     </span>
                   </div>
+                </div>
+                <CardContent className="p-3 flex flex-col justify-between space-y-2">
+                  <div className="text-[9px] uppercase font-bold text-muted-foreground tracking-tighter">{product.category}</div>
+                  <div className="font-semibold text-xs line-clamp-2 h-[32px]">{product.name}</div>
+                  <div className="text-primary font-bold text-base pt-1">${product.price.toLocaleString()}</div>
                 </CardContent>
               </Card>
             ))}
-            {filteredProducts.length === 0 && !searchTerm && (
-              <div className="col-span-full p-8 text-center text-muted-foreground border-2 border-dashed rounded-lg">
-                No hay productos en el inventario. Ve a la sección de Inventario para cargarlos.
-              </div>
-            )}
           </div>
         </div>
 
@@ -247,40 +248,47 @@ export default function POSPage() {
             ) : (
               <div className="divide-y">
                 {cart.map((item) => (
-                  <div key={item.product.id} className="p-4 flex gap-4 items-start group">
+                  <div key={item.product.id} className="p-4 flex gap-4 items-center group">
+                    <div className="h-12 w-12 rounded-md overflow-hidden bg-muted border flex-shrink-0">
+                       <img 
+                        src={item.product.imageUrl || `https://picsum.photos/seed/${item.product.id}/50/50`} 
+                        alt={item.product.name}
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
                     <div className="flex-1 space-y-1">
-                      <div className="font-medium text-sm leading-tight">{item.product.name}</div>
+                      <div className="font-medium text-sm leading-tight line-clamp-1">{item.product.name}</div>
                       <div className="text-xs text-muted-foreground">${item.product.price.toLocaleString()} c/u</div>
                     </div>
                     <div className="flex flex-col items-end gap-2">
-                      <div className="flex items-center gap-3 bg-muted/50 rounded-full p-1">
+                      <div className="flex items-center gap-2 bg-muted/50 rounded-full p-1">
                         <Button 
                           variant="ghost" 
                           size="icon" 
-                          className="h-7 w-7 rounded-full bg-background border"
+                          className="h-6 w-6 rounded-full bg-background border"
                           onClick={() => updateQuantity(item.product.id, -1)}
                         >
-                          <Minus className="h-3.5 w-3.5" />
+                          <Minus className="h-3 w-3" />
                         </Button>
-                        <span className="w-4 text-center font-bold">{item.quantity}</span>
+                        <span className="w-4 text-center text-xs font-bold">{item.quantity}</span>
                         <Button 
                           variant="ghost" 
                           size="icon" 
-                          className="h-7 w-7 rounded-full bg-background border"
+                          className="h-6 w-6 rounded-full bg-background border"
                           onClick={() => addToCart(item.product)}
                         >
-                          <Plus className="h-3.5 w-3.5" />
+                          <Plus className="h-3 w-3" />
                         </Button>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-sm">${(item.product.price * item.quantity).toLocaleString()}</span>
+                        <span className="font-bold text-xs">${(item.product.price * item.quantity).toLocaleString()}</span>
                         <Button 
                           variant="ghost" 
                           size="icon" 
-                          className="h-7 w-7 text-muted-foreground hover:text-red-500"
+                          className="h-6 w-6 text-muted-foreground hover:text-red-500"
                           onClick={() => removeFromCart(item.product.id)}
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </div>
                     </div>
