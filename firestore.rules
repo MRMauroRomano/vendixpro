@@ -4,67 +4,13 @@ service cloud.firestore {
 
     /**
      * VENDIXPRO SECURITY RULES (PROTOTYPE VERSION)
-     *
-     * Se han flexibilizado los roles para el prototipo.
-     * Cualquier usuario autenticado (incluyendo anónimos) se considera "Staff".
+     * 
+     * Para este prototipo, permitimos lectura y escritura a cualquier usuario
+     * que haya iniciado sesión (incluyendo usuarios anónimos).
      */
 
-    // --- HELPER FUNCTIONS ---
-
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-
-    function isExistingOwner(userId) {
-      return resource != null && isOwner(userId);
-    }
-
-    // Role Checks (Simplificados para el prototipo)
-    function isAdmin() {
-      return isSignedIn() && (exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid)) || true);
-    }
-
-    function hasManagementRole() {
-      return isSignedIn();
-    }
-
-    function hasStaffRole() {
-      return isSignedIn();
-    }
-
-    // --- COLLECTION RULES ---
-
-    match /users/{userId} {
-      allow get, list, create, update: if isOwner(userId);
-    }
-
-    match /roles_admin/{id}, /roles_manager/{id}, /roles_seller/{id} {
-      allow read, write: if isSignedIn();
-    }
-
-    match /categories/{id}, /suppliers/{id}, /expense_categories/{id}, /products/{id}, /customers/{id} {
-      allow read, write: if isSignedIn();
-    }
-
-    match /sales/{saleId} {
-      allow read, create: if isSignedIn();
-      allow update, delete: if isSignedIn();
-    }
-
-    match /sales/{saleId}/sale_items/{itemId} {
-      allow read, write: if isSignedIn();
-    }
-
-    match /account_transactions/{id}, /cash_register_sessions/{id}, /expenses/{id} {
-      allow read, write: if isSignedIn();
-    }
-
-    match /cash_register_sessions/{sessionId}/cash_register_movements/{moveId} {
-      allow read, write: if isSignedIn();
+    match /{document=**} {
+      allow read, write: if request.auth != null;
     }
   }
 }
