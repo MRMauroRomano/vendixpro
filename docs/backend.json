@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "User": {
@@ -6,24 +7,11 @@
       "type": "object",
       "description": "Represents an individual user (employee) of the VENDIXPRO system.",
       "properties": {
-        "id": {
-          "type": "string"
-        },
-        "name": {
-          "type": "string"
-        },
-        "email": {
-          "type": "string",
-          "format": "email"
-        },
-        "role": {
-          "type": "string",
-          "enum": ["admin", "manager", "seller"]
-        },
-        "createdAt": {
-          "type": "string",
-          "format": "date-time"
-        }
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "role": { "type": "string", "enum": ["admin", "manager", "seller"] },
+        "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["id", "name", "role", "createdAt"]
     },
@@ -73,6 +61,18 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["id", "totalAmount", "paymentMethod", "userId"]
+    },
+    "Expense": {
+      "title": "Expense",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "concept": { "type": "string" },
+        "category": { "type": "string" },
+        "amount": { "type": "number" },
+        "date": { "type": "string", "format": "date" }
+      },
+      "required": ["id", "concept", "amount", "date"]
     }
   },
   "auth": {
@@ -83,21 +83,25 @@
       "schema": "#/backend/entities/User",
       "description": "User profiles for employees."
     },
-    "/categories/{categoryId}": {
+    "/users/{userId}/categories/{categoryId}": {
       "schema": "#/backend/entities/Category",
-      "description": "Product categories."
+      "description": "Product categories for specific user."
     },
-    "/products/{productId}": {
+    "/users/{userId}/products/{productId}": {
       "schema": "#/backend/entities/Product",
-      "description": "Inventory products."
+      "description": "Inventory products for specific user."
     },
-    "/customers/{customerId}": {
+    "/users/{userId}/customers/{customerId}": {
       "schema": "#/backend/entities/Customer",
-      "description": "Customer list for credits."
+      "description": "Customer list for specific user."
     },
-    "/sales/{saleId}": {
+    "/users/{userId}/sales/{saleId}": {
       "schema": "#/backend/entities/Sale",
-      "description": "Sales records."
+      "description": "Sales records for specific user."
+    },
+    "/users/{userId}/expenses/{expenseId}": {
+      "schema": "#/backend/entities/Expense",
+      "description": "Expenses for specific user."
     }
   }
 }

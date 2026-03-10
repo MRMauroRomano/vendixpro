@@ -50,25 +50,29 @@ interface CartItem {
 }
 
 export default function POSPage() {
-  // Hooks de Firebase corregidos
   const firestore = useFirestore();
   const { user } = useUser();
   const { toast } = useToast();
 
-  // Estado del Carrito y Buscador
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   
-  // Estado de Detalles de Pago
   const [paymentMethod, setPaymentMethod] = useState<string>("");
   const [cashReceived, setCashReceived] = useState<number>(0);
   const [cardType, setCardType] = useState<"Debito" | "Credito" | "">("");
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
 
-  // Referencias a Firestore memoizadas
-  const productsRef = useMemoFirebase(() => collection(firestore, "products"), [firestore]);
-  const customersRef = useMemoFirebase(() => collection(firestore, "customers"), [firestore]);
+  // Rutas de Firestore aisladas por usuario
+  const productsRef = useMemoFirebase(() => {
+    if (!firestore || !user?.uid) return null;
+    return collection(firestore, "users", user.uid, "products");
+  }, [firestore, user?.uid]);
+
+  const customersRef = useMemoFirebase(() => {
+    if (!firestore || !user?.uid) return null;
+    return collection(firestore, "users", user.uid, "customers");
+  }, [firestore, user?.uid]);
   
   const { data: products = [] } = useCollection(productsRef);
   const { data: customers = [] } = useCollection(customersRef);
@@ -118,7 +122,7 @@ export default function POSPage() {
   };
 
   const handleCompleteSale = () => {
-    if (cart.length === 0 || !paymentMethod) return;
+    if (!user || cart.length === 0 || !paymentMethod) return;
     
     if (paymentMethod === "Efectivo" && cashReceived < total) {
       toast({
@@ -146,26 +150,23 @@ export default function POSPage() {
       finalAmount: total,
       paymentMethod: paymentMethod === "Tarjeta" ? `Tarjeta ${cardType}` : paymentMethod,
       status: "Completed",
-      userId: user?.uid || "anonymous",
+      userId: user.uid,
       customerId: selectedCustomerId || null,
       notes: paymentMethod === "Efectivo" ? `Recibido: $${cashReceived} - Vuelto: $${changeDue}` : "",
-      cashRegisterSessionId: "default-session"
     };
 
-    const salesRef = collection(firestore, "sales");
+    const salesRef = collection(firestore, "users", user.uid, "sales");
     addDocumentNonBlocking(salesRef, saleData).then((saleRef) => {
       if (saleRef) {
+        const saleItemsRef = collection(firestore, "users", user.uid, "sales", saleRef.id, "sale_items");
         cart.forEach(item => {
-          const saleItemsRef = collection(firestore, "sales", saleRef.id, "sale_items");
           addDocumentNonBlocking(saleItemsRef, {
             saleId: saleRef.id,
             productId: item.product.id,
             productName: item.product.name,
             quantity: item.quantity,
             unitPrice: item.product.price,
-            discountPerItem: 0,
             subtotal: item.product.price * item.quantity,
-            saleOwnerId: user?.uid || "anonymous"
           });
         });
       }
@@ -184,7 +185,6 @@ export default function POSPage() {
   return (
     <AppLayout>
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[calc(100vh-140px)]">
-        {/* Panel Izquierdo: Productos */}
         <div className="lg:col-span-7 flex flex-col space-y-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -215,10 +215,14 @@ export default function POSPage() {
                 </CardContent>
               </Card>
             ))}
+            {filteredProducts.length === 0 && !searchTerm && (
+              <div className="col-span-full p-8 text-center text-muted-foreground border-2 border-dashed rounded-lg">
+                No hay productos en el inventario. Ve a la sección de Inventario para cargarlos.
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Panel Derecho: Carrito */}
         <Card className="lg:col-span-5 flex flex-col shadow-xl overflow-hidden border-2">
           <CardHeader className="pb-2 border-b bg-muted/20">
             <div className="flex justify-between items-center">
@@ -369,11 +373,15 @@ export default function POSPage() {
                           <SelectValue placeholder="Buscar cliente..." />
                         </SelectTrigger>
                         <SelectContent>
-                          {customers.map(customer => (
-                            <SelectItem key={customer.id} value={customer.id}>
-                              {customer.name} (Saldo: ${customer.currentBalance?.toLocaleString()})
-                            </SelectItem>
-                          ))}
+                          {customers.length === 0 ? (
+                            <SelectItem value="none" disabled>No hay clientes registrados</SelectItem>
+                          ) : (
+                            customers.map(customer => (
+                              <SelectItem key={customer.id} value={customer.id}>
+                                {customer.name} (Saldo: ${customer.currentBalance?.toLocaleString()})
+                              </SelectItem>
+                            ))
+                          )}
                         </SelectContent>
                       </Select>
                     </div>
