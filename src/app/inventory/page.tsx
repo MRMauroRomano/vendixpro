@@ -43,7 +43,7 @@ import * as XLSX from 'xlsx';
 
 export default function InventoryPage() {
   const firestore = useFirestore();
-  const { user } = useUser();
+  const { user } = userHook();
   const { toast } = useToast();
   
   const [searchTerm, setSearchTerm] = useState("");
@@ -51,6 +51,10 @@ export default function InventoryPage() {
   const [isImporting, setIsImporting] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  function userHook() {
+    return useUser();
+  }
 
   // Referencia a productos del usuario
   const productsRef = useMemoFirebase(() => {
@@ -64,13 +68,16 @@ export default function InventoryPage() {
     return collection(firestore, "users", user.uid, "categories");
   }, [firestore, user?.uid]);
 
-  const { data: products = [], isLoading: isProductsLoading } = useCollection(productsRef);
-  const { data: categories = [] } = useCollection(categoriesRef);
+  const { data: productsData, isLoading: isProductsLoading } = useCollection(productsRef);
+  const { data: categoriesData } = useCollection(categoriesRef);
 
-  const filteredProducts = products?.filter(p => 
+  const products = productsData || [];
+  const categories = categoriesData || [];
+
+  const filteredProducts = products.filter(p => 
     p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     p.sku?.toLowerCase().includes(searchTerm.toLowerCase())
-  ) || [];
+  );
 
   const handleAddProduct = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
