@@ -1,0 +1,736 @@
+{
+  "entities": {
+    "User": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "User",
+      "type": "object",
+      "description": "Represents an individual user (employee) of the VENDIXPRO system, distinct from authentication credentials which are managed externally.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the User entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "Full name of the user."
+        },
+        "email": {
+          "type": "string",
+          "description": "Email address of the user.",
+          "format": "email"
+        },
+        "role": {
+          "type": "string",
+          "description": "Role of the user within the system (e.g., 'admin', 'seller')."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the user account was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp when the user account was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "email",
+        "role",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Category": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Category",
+      "type": "object",
+      "description": "Defines categories for products to help with organization and reporting.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Category entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the product category (e.g., 'Electronics', 'Groceries')."
+        },
+        "description": {
+          "type": "string",
+          "description": "Brief description of the category."
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "description"
+      ]
+    },
+    "Supplier": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Supplier",
+      "type": "object",
+      "description": "Information about product suppliers for inventory management.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Supplier entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the supplier company."
+        },
+        "contactPerson": {
+          "type": "string",
+          "description": "Name of the primary contact person at the supplier."
+        },
+        "phone": {
+          "type": "string",
+          "description": "Phone number of the supplier."
+        },
+        "email": {
+          "type": "string",
+          "description": "Email address of the supplier.",
+          "format": "email"
+        },
+        "address": {
+          "type": "string",
+          "description": "Physical address of the supplier."
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "contactPerson",
+        "phone",
+        "address"
+      ]
+    },
+    "Product": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Product",
+      "type": "object",
+      "description": "Details for products managed in the inventory and sold at the POS.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Product entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the product."
+        },
+        "description": {
+          "type": "string",
+          "description": "Detailed description of the product."
+        },
+        "sku": {
+          "type": "string",
+          "description": "Stock Keeping Unit, a unique code for the product."
+        },
+        "price": {
+          "type": "number",
+          "description": "Selling price of the product."
+        },
+        "costPrice": {
+          "type": "number",
+          "description": "Cost price of the product (for profit calculation)."
+        },
+        "stockQuantity": {
+          "type": "number",
+          "description": "Current quantity of the product in stock."
+        },
+        "minStockQuantity": {
+          "type": "number",
+          "description": "Minimum stock quantity to trigger a low stock alert."
+        },
+        "isActive": {
+          "type": "boolean",
+          "description": "Indicates if the product is active and available for sale."
+        },
+        "categoryId": {
+          "type": "string",
+          "description": "Reference to the Category for this product. (Relationship: Category 1:N Product)"
+        },
+        "supplierId": {
+          "type": "string",
+          "description": "Reference to the Supplier of this product. (Relationship: Supplier 1:N Product)"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the product was added.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp when the product details were last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "sku",
+        "price",
+        "costPrice",
+        "stockQuantity",
+        "minStockQuantity",
+        "isActive",
+        "categoryId",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Customer": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Customer",
+      "type": "object",
+      "description": "Represents a customer, particularly for managing credit accounts ('cuentas corrientes').",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Customer entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "Full name of the customer."
+        },
+        "address": {
+          "type": "string",
+          "description": "Physical address of the customer."
+        },
+        "phone": {
+          "type": "string",
+          "description": "Phone number of the customer."
+        },
+        "email": {
+          "type": "string",
+          "description": "Email address of the customer.",
+          "format": "email"
+        },
+        "currentBalance": {
+          "type": "number",
+          "description": "Current credit/debt balance for the customer. Positive for credit, negative for debt."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the customer record was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp when the customer record was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "phone",
+        "currentBalance",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Sale": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Sale",
+      "type": "object",
+      "description": "Represents a completed sales transaction from the Point of Sale.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Sale entity."
+        },
+        "saleDateTime": {
+          "type": "string",
+          "description": "Timestamp when the sale occurred.",
+          "format": "date-time"
+        },
+        "totalAmount": {
+          "type": "number",
+          "description": "Sum of all sale items before taxes and discounts."
+        },
+        "taxAmount": {
+          "type": "number",
+          "description": "Total tax applied to the sale."
+        },
+        "discountAmount": {
+          "type": "number",
+          "description": "Total discount applied to the sale."
+        },
+        "finalAmount": {
+          "type": "number",
+          "description": "Final amount paid by the customer after taxes and discounts."
+        },
+        "paymentMethod": {
+          "type": "string",
+          "description": "Method of payment (e.g., 'Cash', 'Card', 'Credit')."
+        },
+        "status": {
+          "type": "string",
+          "description": "Current status of the sale (e.g., 'Completed', 'Refunded', 'Pending')."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to the User (seller) who processed the sale. (Relationship: User 1:N Sale)"
+        },
+        "customerId": {
+          "type": "string",
+          "description": "Reference to the Customer if the sale was made to a registered customer. (Relationship: Customer 1:N Sale)"
+        },
+        "cashRegisterSessionId": {
+          "type": "string",
+          "description": "Reference to the CashRegisterSession in which this sale occurred. (Relationship: CashRegisterSession 1:N Sale)"
+        },
+        "notes": {
+          "type": "string",
+          "description": "Additional notes for the sale."
+        }
+      },
+      "required": [
+        "id",
+        "saleDateTime",
+        "totalAmount",
+        "taxAmount",
+        "discountAmount",
+        "finalAmount",
+        "paymentMethod",
+        "status",
+        "userId",
+        "cashRegisterSessionId"
+      ]
+    },
+    "SaleItem": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "SaleItem",
+      "type": "object",
+      "description": "Represents an individual product item within a sales transaction.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the SaleItem entity."
+        },
+        "saleId": {
+          "type": "string",
+          "description": "Reference to the Sale this item belongs to. (Relationship: Sale 1:N SaleItem)"
+        },
+        "productId": {
+          "type": "string",
+          "description": "Reference to the Product sold. (Relationship: Product 1:N SaleItem)"
+        },
+        "productName": {
+          "type": "string",
+          "description": "Name of the product at the time of sale (denormalized for historical accuracy)."
+        },
+        "quantity": {
+          "type": "number",
+          "description": "Quantity of the product sold."
+        },
+        "unitPrice": {
+          "type": "number",
+          "description": "Selling price of one unit of the product at the time of sale."
+        },
+        "discountPerItem": {
+          "type": "number",
+          "description": "Discount applied to this specific item."
+        },
+        "subtotal": {
+          "type": "number",
+          "description": "Subtotal for this item (quantity * unitPrice - discountPerItem)."
+        }
+      },
+      "required": [
+        "id",
+        "saleId",
+        "productId",
+        "productName",
+        "quantity",
+        "unitPrice",
+        "subtotal"
+      ]
+    },
+    "AccountTransaction": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "AccountTransaction",
+      "type": "object",
+      "description": "Records financial transactions related to customer credit accounts (payments, charges).",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the AccountTransaction entity."
+        },
+        "customerId": {
+          "type": "string",
+          "description": "Reference to the Customer whose account is affected. (Relationship: Customer 1:N AccountTransaction)"
+        },
+        "transactionDateTime": {
+          "type": "string",
+          "description": "Timestamp when the transaction occurred.",
+          "format": "date-time"
+        },
+        "amount": {
+          "type": "number",
+          "description": "Amount of the transaction. Positive for payments, negative for new charges/debt."
+        },
+        "type": {
+          "type": "string",
+          "description": "Type of transaction (e.g., 'Charge', 'Payment')."
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of the transaction."
+        },
+        "saleId": {
+          "type": "string",
+          "description": "Reference to the Sale if this transaction is related to a specific sale (e.g., a credit sale). (Relationship: Sale 1:N AccountTransaction)"
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to the User who recorded this transaction. (Relationship: User 1:N AccountTransaction)"
+        }
+      },
+      "required": [
+        "id",
+        "customerId",
+        "transactionDateTime",
+        "amount",
+        "type",
+        "description",
+        "userId"
+      ]
+    },
+    "CashRegisterSession": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "CashRegisterSession",
+      "type": "object",
+      "description": "Manages the daily opening and closing of the cash register, tracking its balance.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the CashRegisterSession entity."
+        },
+        "openingDateTime": {
+          "type": "string",
+          "description": "Timestamp when the cash register session was opened.",
+          "format": "date-time"
+        },
+        "closingDateTime": {
+          "type": "string",
+          "description": "Timestamp when the cash register session was closed.",
+          "format": "date-time"
+        },
+        "initialBalance": {
+          "type": "number",
+          "description": "Amount of cash in the register at the start of the session."
+        },
+        "finalBalance": {
+          "type": "number",
+          "description": "Amount of cash in the register at the end of the session."
+        },
+        "status": {
+          "type": "string",
+          "description": "Status of the session (e.g., 'Open', 'Closed')."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to the User who opened/closed the session. (Relationship: User 1:N CashRegisterSession)"
+        }
+      },
+      "required": [
+        "id",
+        "openingDateTime",
+        "initialBalance",
+        "status",
+        "userId"
+      ]
+    },
+    "CashRegisterMovement": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "CashRegisterMovement",
+      "type": "object",
+      "description": "Records individual cash inflows, outflows, and adjustments within a cash register session.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the CashRegisterMovement entity."
+        },
+        "cashRegisterSessionId": {
+          "type": "string",
+          "description": "Reference to the CashRegisterSession this movement belongs to. (Relationship: CashRegisterSession 1:N CashRegisterMovement)"
+        },
+        "movementDateTime": {
+          "type": "string",
+          "description": "Timestamp when the cash movement occurred.",
+          "format": "date-time"
+        },
+        "type": {
+          "type": "string",
+          "description": "Type of movement (e.g., 'Sale Income', 'Expense Debit', 'Adjustment Credit', 'Adjustment Debit')."
+        },
+        "amount": {
+          "type": "number",
+          "description": "Amount of cash involved in the movement."
+        },
+        "description": {
+          "type": "string",
+          "description": "Description or reason for the cash movement."
+        },
+        "sourceEntityId": {
+          "type": "string",
+          "description": "Optional reference to the ID of the related entity (e.g., Sale ID, Expense ID)."
+        },
+        "sourceEntityType": {
+          "type": "string",
+          "description": "Optional type of the related entity (e.g., 'Sale', 'Expense') for traceability."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to the User who recorded this movement. (Relationship: User 1:N CashRegisterMovement)"
+        }
+      },
+      "required": [
+        "id",
+        "cashRegisterSessionId",
+        "movementDateTime",
+        "type",
+        "amount",
+        "description",
+        "userId"
+      ]
+    },
+    "ExpenseCategory": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ExpenseCategory",
+      "type": "object",
+      "description": "Defines categories for operational expenses.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the ExpenseCategory entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the expense category (e.g., 'Rent', 'Utilities', 'Office Supplies')."
+        },
+        "description": {
+          "type": "string",
+          "description": "Brief description of the expense category."
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "description"
+      ]
+    },
+    "Expense": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Expense",
+      "type": "object",
+      "description": "Records operational expenses of the business.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Expense entity."
+        },
+        "expenseDateTime": {
+          "type": "string",
+          "description": "Timestamp when the expense occurred or was recorded.",
+          "format": "date-time"
+        },
+        "amount": {
+          "type": "number",
+          "description": "Amount of the expense."
+        },
+        "description": {
+          "type": "string",
+          "description": "Detailed description of the expense."
+        },
+        "expenseCategoryId": {
+          "type": "string",
+          "description": "Reference to the category of this expense. (Relationship: ExpenseCategory 1:N Expense)"
+        },
+        "cashRegisterMovementId": {
+          "type": "string",
+          "description": "Optional reference to the CashRegisterMovement that records the cash outflow for this expense. (Relationship: CashRegisterMovement 1:N Expense)"
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to the User who recorded this expense. (Relationship: User 1:N Expense)"
+        }
+      },
+      "required": [
+        "id",
+        "expenseDateTime",
+        "amount",
+        "description",
+        "expenseCategoryId",
+        "userId"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Stores individual user profiles, primarily for system users/employees. Access is path-based for the user's own profile (userId == request.auth.uid). Contains the user's role field for display logic."
+        }
+      },
+      {
+        "path": "/roles_admin/{adminId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Dedicated collection for admin role-based authorization. The existence of a document with `adminId` as its ID grants admin permissions, enabling efficient 'existence-based' checks in security rules without `get()` calls. The document content is typically a simple marker."
+        }
+      },
+      {
+        "path": "/roles_manager/{managerId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Dedicated collection for manager role-based authorization. The existence of a document with `managerId` as its ID grants manager permissions, enabling efficient 'existence-based' checks in security rules without `get()` calls. The document content is typically a simple marker."
+        }
+      },
+      {
+        "path": "/roles_seller/{sellerId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Dedicated collection for seller role-based authorization. The existence of a document with `sellerId` as its ID grants seller permissions, enabling efficient 'existence-based' checks in security rules without `get()` calls. The document content is typically a simple marker."
+        }
+      },
+      {
+        "path": "/categories/{categoryId}",
+        "definition": {
+          "entityName": "Category",
+          "schema": {
+            "$ref": "#/backend/entities/Category"
+          },
+          "description": "Global collection for product categories. Managed by users with 'admin' or 'manager' roles."
+        }
+      },
+      {
+        "path": "/suppliers/{supplierId}",
+        "definition": {
+          "entityName": "Supplier",
+          "schema": {
+            "$ref": "#/backend/entities/Supplier"
+          },
+          "description": "Global collection for supplier details. Managed by users with 'admin' or 'manager' roles."
+        }
+      },
+      {
+        "path": "/products/{productId}",
+        "definition": {
+          "entityName": "Product",
+          "schema": {
+            "$ref": "#/backend/entities/Product"
+          },
+          "description": "Global collection for product inventory. Managed by users with 'admin' or 'manager' roles, readable by 'seller' roles."
+        }
+      },
+      {
+        "path": "/customers/{customerId}",
+        "definition": {
+          "entityName": "Customer",
+          "schema": {
+            "$ref": "#/backend/entities/Customer"
+          },
+          "description": "Global collection for customer profiles, especially for managing credit accounts. Managed by users with 'admin' or 'manager' roles, with sellers able to create/update as part of sales/transactions."
+        }
+      },
+      {
+        "path": "/sales/{saleId}",
+        "definition": {
+          "entityName": "Sale",
+          "schema": {
+            "$ref": "#/backend/entities/Sale"
+          },
+          "description": "Records individual sales transactions. Each sale includes the `userId` of the seller who processed it. Access to sales is granted to the `userId` owner or users with 'manager'/'admin' roles. Supports QAPs by enforcing `where('userId', '==', request.auth.uid)` for sellers listing their own sales."
+        }
+      },
+      {
+        "path": "/sales/{saleId}/sale_items/{saleItemId}",
+        "definition": {
+          "entityName": "SaleItem",
+          "schema": {
+            "$ref": "#/backend/entities/SaleItem"
+          },
+          "description": "Subcollection storing individual product items within a sale. Includes denormalized `saleOwnerId` (copied from `Sale.userId`) for authorization independence, allowing secure access rules without requiring a `get()` call to the parent `Sale` document."
+        }
+      },
+      {
+        "path": "/account_transactions/{accountTransactionId}",
+        "definition": {
+          "entityName": "AccountTransaction",
+          "schema": {
+            "$ref": "#/backend/entities/AccountTransaction"
+          },
+          "description": "Records financial transactions related to customer credit accounts. Each transaction includes the `userId` of the recorder and the `customerId`. Access is granted to the `userId` owner or users with 'manager'/'admin' roles."
+        }
+      },
+      {
+        "path": "/cash_register_sessions/{cashRegisterSessionId}",
+        "definition": {
+          "entityName": "CashRegisterSession",
+          "schema": {
+            "$ref": "#/backend/entities/CashRegisterSession"
+          },
+          "description": "Manages daily opening and closing of the cash register. Each session is associated with a `userId` (the employee who opened/closed it). Access to sessions is granted to the `userId` owner or users with 'manager'/'admin' roles. Supports QAPs."
+        }
+      },
+      {
+        "path": "/cash_register_sessions/{cashRegisterSessionId}/cash_register_movements/{cashRegisterMovementId}",
+        "definition": {
+          "entityName": "CashRegisterMovement",
+          "schema": {
+            "$ref": "#/backend/entities/CashRegisterMovement"
+          },
+          "description": "Subcollection recording individual cash inflows, outflows, and adjustments within a specific cash register session. Includes denormalized `sessionOwnerId` (copied from `CashRegisterSession.userId`) for authorization independence, allowing secure access rules without requiring a `get()` call to the parent `CashRegisterSession` document."
+        }
+      },
+      {
+        "path": "/expense_categories/{expenseCategoryId}",
+        "definition": {
+          "entityName": "ExpenseCategory",
+          "schema": {
+            "$ref": "#/backend/entities/ExpenseCategory"
+          },
+          "description": "Global collection defining categories for operational expenses. Managed by users with 'admin' or 'manager' roles."
+        }
+      },
+      {
+        "path": "/expenses/{expenseId}",
+        "definition": {
+          "entityName": "Expense",
+          "schema": {
+            "$ref": "#/backend/entities/Expense"
+          },
+          "description": "Records individual operational expenses. Each expense is associated with a `userId` (the employee who recorded it). Access to expenses is granted to the `userId` owner or users with 'manager'/'admin' roles. Supports QAPs."
+        }
+      }
+    ],
+    "reasoning": "The Firestore structure for VENDIXPRO prioritizes security, scalability, and debuggability by adhering to the mandated design principles, especially Authorization Independence and secure Query As a Policy (QAP) enforcement. The overall strategy combines flat, global collections for core business entities with hierarchical structures for user-initiated transactional data, incorporating denormalization for robust authorization.\n\n**Authorization Independence:**\n1.  **Role-Based Access Control (DBAC):** To eliminate expensive and problematic `get()` calls for general role-based authorization, we implement DBAC using 'Existence over Content' collections. Instead of querying a user's role from `/users/{userId}`, we introduce dedicated collections like `/roles_admin/{userId}`, `/roles_manager/{userId}`, and `/roles_seller/{userId}`. A user's role is determined by the *existence* of their UID as a document ID in one of these collections. This allows security rules to check `exists(/roles_admin/$(request.auth.uid))` which is efficient and does not create hierarchical dependencies that break atomic operations.\n2.  **Subcollection Denormalization:** For subcollections whose authorization relies on parent document attributes, the critical authorization fields are denormalized. Specifically:\n    *   `SaleItem` documents, residing in `/sales/{saleId}/sale_items/{saleItemId}`, will include a denormalized `saleOwnerId` field, copied from the parent `Sale.userId`. This ensures that security rules for `SaleItem` do not need to perform a `get()` operation on the parent `Sale` document to determine ownership or permissions.\n    *   `CashRegisterMovement` documents, residing in `/cash_register_sessions/{cashRegisterSessionId}/cash_register_movements/{cashRegisterMovementId}`, will include a denormalized `sessionOwnerId` field, copied from the parent `CashRegisterSession.userId`. This enables independent authorization checks for movements without querying the session details.\n\n**Query As a Policy (QAPs):**\n1.  **Global Collections:** For entities like `/categories`, `/suppliers`, `/products`, `/customers`, and `/expense_categories`, access is granted based on the user's role. For instance, any user with a 'seller' role (checked via `exists(/roles_seller/$(request.auth.uid))`) might have read access to all products. This fulfills QAPs as the entire collection (or a significant, logically grouped portion) is accessible based on the user's role, thus 'rules are not filters' for these broad permissions.\n2.  **User-Scoped Data with Role Overrides:** For transactional data such as `/sales`, `/expenses`, and `/cash_register_sessions`, each document includes a `userId` field. To enforce QAPs:\n    *   **User-Specific Lists:** A regular seller (`roles_seller` only) attempting to `list` documents in these collections *must* include a `where('userId', '==', request.auth.uid)` filter in their query. Security rules will enforce this, ensuring that users only retrieve their own data unless explicitly authorized otherwise.\n    *   **Manager/Admin Overrides:** Users with 'manager' or 'admin' roles (checked via `exists(/roles_manager/$(request.auth.uid))` or `exists(/roles_admin/$(request.auth.uid))`) are allowed to `list` all documents within these collections without specific `userId` filters. This provides a secure and scalable way to grant broader oversight capabilities without compromising the QAP principle for individual users.\n\n**Structural Segregation & Predictability:**\nAll documents within a collection share a homogeneous security posture. Data types are consistent within collections, and naming conventions (e.g., plural collection names, descriptive wildcards like `{productId}`, explicit `status` fields) enhance clarity and debuggability."
+  }
+}
