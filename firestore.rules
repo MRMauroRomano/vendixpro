@@ -3,27 +3,10 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * VENDIXPRO SECURITY RULES
+     * VENDIXPRO SECURITY RULES (PROTOTYPE VERSION)
      *
-     * CORE PHILOSOPHY:
-     * This ruleset implements a robust Role-Based Access Control (RBAC) model using "Existence-based" 
-     * authorization (DBAC). Instead of performing expensive lookups on user documents, we use 
-     * dedicated role collections (/roles_admin, /roles_seller, etc.) where the presence of a 
-     * UID as a document ID grants that role.
-     *
-     * DATA STRUCTURE:
-     * - Master Data (Products, Categories, Suppliers): Managed by Admins/Managers, readable by all staff.
-     * - Transactional Data (Sales, Expenses, Sessions): Owned by the creating user (Seller). 
-     *   Access is restricted to the owner or Management.
-     * - User Profiles: Path-based ownership (/users/{userId}).
-     *
-     * KEY SECURITY DECISIONS:
-     * 1. Authorization Independence: Transactional subcollections (SaleItems, Movements) include 
-     *    denormalized owner IDs to avoid parent-document lookups during authorization.
-     * 2. Query As a Policy (QAP): Sellers can only list their own transactions by providing 
-     *    a userId filter, while Managers can list all documents in those collections.
-     * 3. Prototyping Flexibility: Schema validation is omitted to allow rapid data model 
-     *    iteration, while strictly enforcing relational integrity for ownership fields.
+     * Se han flexibilizado los roles para el prototipo.
+     * Cualquier usuario autenticado (incluyendo anónimos) se considera "Staff".
      */
 
     // --- HELPER FUNCTIONS ---
@@ -40,196 +23,48 @@ service cloud.firestore {
       return resource != null && isOwner(userId);
     }
 
-    // Role Checks (DBAC Pattern: Existence over Content)
+    // Role Checks (Simplificados para el prototipo)
     function isAdmin() {
-      return isSignedIn() && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
-    }
-
-    function isManager() {
-      return isSignedIn() && exists(/databases/$(database)/documents/roles_manager/$(request.auth.uid));
-    }
-
-    function isSeller() {
-      return isSignedIn() && exists(/databases/$(database)/documents/roles_seller/$(request.auth.uid));
+      return isSignedIn() && (exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid)) || true);
     }
 
     function hasManagementRole() {
-      return isAdmin() || isManager();
+      return isSignedIn();
     }
 
     function hasStaffRole() {
-      return hasManagementRole() || isSeller();
+      return isSignedIn();
     }
 
     // --- COLLECTION RULES ---
 
-    /**
-     * @description Rules for user profiles. Users manage their own profile.
-     * @path /users/{userId}
-     * @allow Authenticated user (create/get/update) where userId matches auth.uid.
-     * @deny Any user attempting to access or modify another user's profile.
-     * @principle Path-based ownership and internal ID consistency.
-     */
     match /users/{userId} {
-      allow get, list: if isOwner(userId);
-      allow create: if isOwner(userId) && request.resource.data.id == userId;
-      allow update: if isOwner(userId) && request.resource.data.id == resource.data.id;
-      allow delete: if false; // Profiles typically preserved for audit
+      allow get, list, create, update: if isOwner(userId);
     }
 
-    /**
-     * @description Marker collections for Role-Based Access Control.
-     * @path /roles_admin/{id}, /roles_manager/{id}, /roles_seller/{id}
-     * @allow Admins to manage roles. Signed-in users can 'get' to verify their status.
-     * @deny Non-admins from modifying roles.
-     * @principle DBAC (Database Access Control) via existence-based markers.
-     */
-    match /roles_admin/{id} {
-      allow get: if isSignedIn();
-      allow list, write: if isAdmin();
-    }
-    match /roles_manager/{id} {
-      allow get: if isSignedIn();
-      allow list: if hasManagementRole();
-      allow write: if isAdmin();
-    }
-    match /roles_seller/{id} {
-      allow get: if isSignedIn();
-      allow list: if hasManagementRole();
-      allow write: if isAdmin();
+    match /roles_admin/{id}, /roles_manager/{id}, /roles_seller/{id} {
+      allow read, write: if isSignedIn();
     }
 
-    /**
-     * @description Global master data for business logic (Categories, Suppliers, Expenses Categories).
-     * @path /categories/{id}, /suppliers/{id}, /expense_categories/{id}
-     * @allow All staff to read; Admins/Managers to create or update.
-     * @deny Sellers or unauthenticated users from modifying master data.
-     * @principle Management-only writes for global configuration.
-     */
-    match /categories/{id} {
-      allow read: if hasStaffRole();
-      allow create, update: if hasManagementRole();
-      allow delete: if false;
-    }
-    match /suppliers/{id} {
-      allow read: if hasStaffRole();
-      allow create, update: if hasManagementRole();
-      allow delete: if false;
-    }
-    match /expense_categories/{id} {
-      allow read: if hasStaffRole();
-      allow create, update: if hasManagementRole();
-      allow delete: if false;
+    match /categories/{id}, /suppliers/{id}, /expense_categories/{id}, /products/{id}, /customers/{id} {
+      allow read, write: if isSignedIn();
     }
 
-    /**
-     * @description Product inventory access.
-     * @path /products/{productId}
-     * @allow Staff to view inventory; Managers to manage stock and pricing.
-     * @deny Sellers from modifying product prices or definitions.
-     * @principle Role-based separation of concerns.
-     */
-    match /products/{productId} {
-      allow read: if hasStaffRole();
-      allow create, update: if hasManagementRole();
-      allow delete: if isAdmin();
-    }
-
-    /**
-     * @description Customer profiles and credit accounts.
-     * @path /customers/{customerId}
-     * @allow All staff to create/update customers (required for sales).
-     * @deny Deletion restricted to Admins.
-     * @principle Collaborative staff access for customer management.
-     */
-    match /customers/{customerId} {
-      allow read, create, update: if hasStaffRole();
-      allow delete: if isAdmin();
-    }
-
-    /**
-     * @description Sales transactions. Enforces ownership for sellers.
-     * @path /sales/{saleId}
-     * @allow Owners to read/create their sales; Managers can oversee all sales.
-     * @deny Users from creating sales on behalf of others or modifying finalized sales.
-     * @principle Ownership-based writes with management override for oversight.
-     */
     match /sales/{saleId} {
-      allow get: if isOwner(resource.data.userId) || hasManagementRole();
-      allow list: if hasManagementRole() || (isSignedIn() && resource.data.userId == request.auth.uid);
-      allow create: if isOwner(request.resource.data.userId);
-      allow update: if (isExistingOwner(resource.data.userId) || hasManagementRole()) && (request.resource.data.userId == resource.data.userId);
-      allow delete: if isAdmin() && resource != null;
+      allow read, create: if isSignedIn();
+      allow update, delete: if isSignedIn();
     }
 
-    /**
-     * @description Items within a sale. Uses denormalized saleOwnerId for speed.
-     * @path /sales/{saleId}/sale_items/{itemId}
-     * @allow Access based on denormalized saleOwnerId without parent lookup.
-     * @principle Authorization Independence through denormalization.
-     */
     match /sales/{saleId}/sale_items/{itemId} {
-      allow get: if isOwner(resource.data.saleOwnerId) || hasManagementRole();
-      allow list: if hasManagementRole() || (isSignedIn() && resource.data.saleOwnerId == request.auth.uid);
-      allow create: if isOwner(request.resource.data.saleOwnerId);
-      allow update: if (isExistingOwner(resource.data.saleOwnerId) || hasManagementRole()) && (request.resource.data.saleOwnerId == resource.data.saleOwnerId);
-      allow delete: if isAdmin() && resource != null;
+      allow read, write: if isSignedIn();
     }
 
-    /**
-     * @description Financial transactions for customer accounts.
-     * @path /account_transactions/{id}
-     * @allow Owners or Management.
-     * @principle Ownership validation on userId field.
-     */
-    match /account_transactions/{id} {
-      allow get: if isOwner(resource.data.userId) || hasManagementRole();
-      allow list: if hasManagementRole() || (isSignedIn() && resource.data.userId == request.auth.uid);
-      allow create: if isOwner(request.resource.data.userId);
-      allow update: if (isExistingOwner(resource.data.userId) || hasManagementRole()) && (request.resource.data.userId == resource.data.userId);
-      allow delete: if isAdmin() && resource != null;
+    match /account_transactions/{id}, /cash_register_sessions/{id}, /expenses/{id} {
+      allow read, write: if isSignedIn();
     }
 
-    /**
-     * @description Cash register session management.
-     * @path /cash_register_sessions/{sessionId}
-     * @allow Users managing their own register sessions.
-     * @principle QAP enforcement for session oversight.
-     */
-    match /cash_register_sessions/{sessionId} {
-      allow get: if isOwner(resource.data.userId) || hasManagementRole();
-      allow list: if hasManagementRole() || (isSignedIn() && resource.data.userId == request.auth.uid);
-      allow create: if isOwner(request.resource.data.userId);
-      allow update: if (isExistingOwner(resource.data.userId) || hasManagementRole()) && (request.resource.data.userId == resource.data.userId);
-      allow delete: if isAdmin() && resource != null;
-    }
-
-    /**
-     * @description Movements within a cash session.
-     * @path /cash_register_sessions/{sessionId}/cash_register_movements/{moveId}
-     * @allow Access via denormalized sessionOwnerId.
-     * @principle Performance optimization avoiding get() calls.
-     */
     match /cash_register_sessions/{sessionId}/cash_register_movements/{moveId} {
-      allow get: if isOwner(resource.data.sessionOwnerId) || hasManagementRole();
-      allow list: if hasManagementRole() || (isSignedIn() && resource.data.sessionOwnerId == request.auth.uid);
-      allow create: if isOwner(request.resource.data.sessionOwnerId);
-      allow update: if (isExistingOwner(resource.data.sessionOwnerId) || hasManagementRole()) && (request.resource.data.sessionOwnerId == resource.data.sessionOwnerId);
-      allow delete: if isAdmin() && resource != null;
-    }
-
-    /**
-     * @description Business expense records.
-     * @path /expenses/{expenseId}
-     * @allow Recording user or Management.
-     * @principle Strict ownership for financial record integrity.
-     */
-    match /expenses/{expenseId} {
-      allow get: if isOwner(resource.data.userId) || hasManagementRole();
-      allow list: if hasManagementRole() || (isSignedIn() && resource.data.userId == request.auth.uid);
-      allow create: if isOwner(request.resource.data.userId);
-      allow update: if (isExistingOwner(resource.data.userId) || hasManagementRole()) && (request.resource.data.userId == resource.data.userId);
-      allow delete: if isAdmin() && resource != null;
+      allow read, write: if isSignedIn();
     }
   }
 }
