@@ -27,9 +27,10 @@ import { useToast } from "@/hooks/use-toast";
 import * as XLSX from 'xlsx';
 
 export default function InventoryPage() {
-  const { firestore } = useFirestore();
+  const firestore = useFirestore();
   const { user } = useUser();
   const { toast } = useToast();
+  
   const [searchTerm, setSearchTerm] = useState("");
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
@@ -58,6 +59,7 @@ export default function InventoryPage() {
       category: formData.get("category") as string,
       provider: formData.get("provider") as string,
       sku: formData.get("sku") as string || `SKU-${Date.now()}`,
+      createdAt: new Date().toISOString()
     };
 
     addDocumentNonBlocking(productsRef, newProduct);
@@ -97,11 +99,11 @@ export default function InventoryPage() {
             title: "Archivo vacío",
             description: "No se encontraron datos en el Excel seleccionado."
           });
+          setIsImporting(false);
           return;
         }
 
         data.forEach((row: any) => {
-          // Mapeo flexible de columnas (español e inglés)
           const newProduct = {
             name: row.Nombre || row.name || row.Producto || "Producto sin nombre",
             price: Number(row.Precio || row.price || row.Monto || 0),
@@ -109,6 +111,7 @@ export default function InventoryPage() {
             category: row.Categoría || row.category || row.Rubro || "General",
             provider: row.Proveedor || row.provider || "",
             sku: row.SKU || row.sku || row.Código || `SKU-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+            createdAt: new Date().toISOString()
           };
           addDocumentNonBlocking(productsRef, newProduct);
         });
