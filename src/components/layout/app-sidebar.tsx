@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -12,7 +12,8 @@ import {
   Receipt,
   Users,
   LogOut,
-  ShoppingBag
+  ShoppingBag,
+  UserCircle
 } from "lucide-react";
 import {
   Sidebar,
@@ -24,6 +25,9 @@ import {
   SidebarMenuItem,
   SidebarSeparator,
 } from "@/components/ui/sidebar";
+import { useAuth, useUser } from "@/firebase";
+import { signOut } from "firebase/auth";
+import { useToast } from "@/hooks/use-toast";
 
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/" },
@@ -37,6 +41,27 @@ const navItems = [
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const auth = useAuth();
+  const { user } = useUser();
+  const { toast } = useToast();
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      toast({
+        title: "Sesión cerrada",
+        description: "Has salido del sistema correctamente.",
+      });
+      router.push("/auth");
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Error al cerrar sesión",
+        description: "No se pudo cerrar la sesión. Intenta de nuevo.",
+      });
+    }
+  };
 
   return (
     <Sidebar collapsible="icon">
@@ -66,13 +91,42 @@ export function AppSidebar() {
           ))}
         </SidebarMenu>
       </SidebarContent>
-      <SidebarFooter className="p-4">
+      <SidebarFooter className="p-4 space-y-2">
+        {user && !user.isAnonymous && (
+          <div className="px-2 py-2 mb-2 bg-accent/10 rounded-lg group-data-[collapsible=icon]:hidden">
+            <div className="flex items-center gap-2">
+              <UserCircle className="h-8 w-8 text-accent" />
+              <div className="flex flex-col overflow-hidden">
+                <span className="text-xs font-bold truncate">{user.displayName || "Usuario"}</span>
+                <span className="text-[10px] opacity-70 truncate">{user.email}</span>
+              </div>
+            </div>
+          </div>
+        )}
+        
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton className="text-red-300 hover:text-red-100 hover:bg-red-900/20">
-              <LogOut className="h-5 w-5" />
-              <span>Cerrar Sesión</span>
-            </SidebarMenuButton>
+            {user && !user.isAnonymous ? (
+              <SidebarMenuButton 
+                onClick={handleLogout}
+                className="text-red-300 hover:text-red-100 hover:bg-red-900/20 py-6"
+                tooltip="Cerrar Sesión"
+              >
+                <LogOut className="h-5 w-5" />
+                <span>Cerrar Sesión</span>
+              </SidebarMenuButton>
+            ) : (
+              <SidebarMenuButton 
+                asChild
+                className="text-accent hover:bg-accent/10 py-6"
+                tooltip="Iniciar Sesión"
+              >
+                <Link href="/auth">
+                  <UserCircle className="h-5 w-5" />
+                  <span>Iniciar Sesión</span>
+                </Link>
+              </SidebarMenuButton>
+            )}
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>
