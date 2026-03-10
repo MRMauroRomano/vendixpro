@@ -45,11 +45,12 @@ export default function CategoriesPage() {
     return collection(firestore, "users", user.uid, "categories");
   }, [firestore, user?.uid]);
 
-  const { data: categories = [], isLoading } = useCollection(categoriesRef);
+  const { data: categoriesData, isLoading } = useCollection(categoriesRef);
+  const categories = categoriesData || [];
 
-  const filteredCategories = categories?.filter(c => 
-    c.name.toLowerCase().includes(searchTerm.toLowerCase())
-  ) || [];
+  const filteredCategories = categories.filter(c => 
+    c.name?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   const handleAddCategory = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();

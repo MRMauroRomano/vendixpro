@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from "react";
@@ -26,7 +25,8 @@ export default function LowStockPage() {
     return collection(firestore, "users", user.uid, "products");
   }, [firestore, user?.uid]);
 
-  const { data: products = [], isLoading } = useCollection(productsRef);
+  const { data: productsData, isLoading } = useCollection(productsRef);
+  const products = productsData || [];
 
   // Filtramos productos con stock <= 5
   const lowStockProducts = products.filter(p => (p.stockQuantity || 0) <= 5);

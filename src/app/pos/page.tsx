@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from "react";
@@ -74,11 +73,14 @@ export default function POSPage() {
     return collection(firestore, "users", user.uid, "customers");
   }, [firestore, user?.uid]);
   
-  const { data: products = [] } = useCollection(productsRef);
-  const { data: customers = [] } = useCollection(customersRef);
+  const { data: productsData } = useCollection(productsRef);
+  const { data: customersData } = useCollection(customersRef);
+
+  const products = productsData || [];
+  const customers = customersData || [];
 
   const filteredProducts = products.filter(p => 
-    p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (p.sku && p.sku.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 

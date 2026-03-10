@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useRef } from "react";
@@ -65,8 +64,11 @@ export default function InventoryPage() {
     return collection(firestore, "users", user.uid, "categories");
   }, [firestore, user?.uid]);
 
-  const { data: products = [], isLoading: isProductsLoading } = useCollection(productsRef);
-  const { data: categories = [] } = useCollection(categoriesRef);
+  const { data: productsData, isLoading: isProductsLoading } = useCollection(productsRef);
+  const { data: categoriesData } = useCollection(categoriesRef);
+
+  const products = productsData || [];
+  const categories = categoriesData || [];
 
   const filteredProducts = products.filter(p => 
     p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
