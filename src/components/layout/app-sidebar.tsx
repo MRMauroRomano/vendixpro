@@ -13,7 +13,11 @@ import {
   Users,
   LogOut,
   ShoppingBag,
-  UserCircle
+  UserCircle,
+  ChevronRight,
+  AlertTriangle,
+  Tags,
+  Layers
 } from "lucide-react";
 import {
   Sidebar,
@@ -24,7 +28,15 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarSeparator,
+  SidebarMenuSub,
+  SidebarMenuSubItem,
+  SidebarMenuSubButton,
 } from "@/components/ui/sidebar";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { useAuth, useUser } from "@/firebase";
 import { signOut } from "firebase/auth";
 import { useToast } from "@/hooks/use-toast";
@@ -32,7 +44,16 @@ import { useToast } from "@/hooks/use-toast";
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/" },
   { icon: ShoppingCart, label: "Punto de Venta", href: "/pos" },
-  { icon: Package, label: "Inventario", href: "/inventory" },
+  { 
+    icon: Package, 
+    label: "Inventario", 
+    href: "/inventory",
+    items: [
+      { label: "Todos los Productos", href: "/inventory", icon: Layers },
+      { label: "Stock Bajo", href: "/inventory/low-stock", icon: AlertTriangle },
+      { label: "Categorías", href: "/inventory/categories", icon: Tags },
+    ]
+  },
   { icon: History, label: "Historial de Ventas", href: "/sales" },
   { icon: Wallet, label: "Control de Caja", href: "/cash" },
   { icon: Receipt, label: "Gastos", href: "/expenses" },
@@ -74,21 +95,61 @@ export function AppSidebar() {
       <SidebarSeparator className="opacity-10" />
       <SidebarContent className="py-4">
         <SidebarMenu>
-          {navItems.map((item) => (
-            <SidebarMenuItem key={item.href}>
-              <SidebarMenuButton
-                asChild
-                isActive={pathname === item.href}
-                tooltip={item.label}
-                className="hover:bg-sidebar-accent transition-colors py-6"
-              >
-                <Link href={item.href}>
-                  <item.icon className="h-5 w-5" />
-                  <span className="font-medium">{item.label}</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          ))}
+          {navItems.map((item) => {
+            const hasSubItems = item.items && item.items.length > 0;
+            const isActive = pathname === item.href || item.items?.some(sub => pathname === sub.href);
+
+            if (hasSubItems) {
+              return (
+                <Collapsible
+                  key={item.label}
+                  asChild
+                  defaultOpen={isActive}
+                  className="group/collapsible"
+                >
+                  <SidebarMenuItem>
+                    <CollapsibleTrigger asChild>
+                      <SidebarMenuButton tooltip={item.label} className="py-6">
+                        <item.icon className="h-5 w-5" />
+                        <span className="font-medium">{item.label}</span>
+                        <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                      </SidebarMenuButton>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <SidebarMenuSub>
+                        {item.items?.map((subItem) => (
+                          <SidebarMenuSubItem key={subItem.href}>
+                            <SidebarMenuSubButton asChild isActive={pathname === subItem.href}>
+                              <Link href={subItem.href} className="flex items-center gap-2">
+                                <subItem.icon className="h-4 w-4 opacity-70" />
+                                <span>{subItem.label}</span>
+                              </Link>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        ))}
+                      </SidebarMenuSub>
+                    </CollapsibleContent>
+                  </SidebarMenuItem>
+                </Collapsible>
+              );
+            }
+
+            return (
+              <SidebarMenuItem key={item.href}>
+                <SidebarMenuButton
+                  asChild
+                  isActive={pathname === item.href}
+                  tooltip={item.label}
+                  className="hover:bg-sidebar-accent transition-colors py-6"
+                >
+                  <Link href={item.href}>
+                    <item.icon className="h-5 w-5" />
+                    <span className="font-medium">{item.label}</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            );
+          })}
         </SidebarMenu>
       </SidebarContent>
       <SidebarFooter className="p-4 space-y-2">
