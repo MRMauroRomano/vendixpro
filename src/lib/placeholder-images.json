@@ -1,3 +1,16 @@
 {
-  "placeholderImages": []
+  "placeholderImages": [
+    {
+      "id": "logo",
+      "description": "VENDIXPRO Logo with shopping bag",
+      "imageUrl": "https://picsum.photos/seed/vendix/200/200",
+      "imageHint": "shopping bag logo"
+    },
+    {
+      "id": "hero-dashboard",
+      "description": "Dashboard overview background",
+      "imageUrl": "https://picsum.photos/seed/dashboard/1200/800",
+      "imageHint": "business dashboard"
+    }
+  ]
 }
