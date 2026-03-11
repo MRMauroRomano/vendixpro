@@ -1,6 +1,7 @@
+
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { AppLayout } from "@/components/layout/app-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -107,13 +108,17 @@ export default function InventoryPage() {
   const { data: productsData, isLoading: isProductsLoading } = useCollection(productsRef);
   const { data: categoriesData } = useCollection(categoriesRef);
 
-  const products = productsData || [];
-  const categories = categoriesData || [];
+  // Memoizar arreglos base para evitar recreación en cada renderizado
+  const products = useMemo(() => productsData || [], [productsData]);
+  const categories = useMemo(() => categoriesData || [], [categoriesData]);
 
-  const filteredProducts = products.filter(p => 
-    p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.sku?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Memoizar productos filtrados para evitar bucles en useEffect
+  const filteredProducts = useMemo(() => {
+    return products.filter(p => 
+      p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.sku?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [products, searchTerm]);
 
   useEffect(() => {
     if (isMassEditOpen) {
