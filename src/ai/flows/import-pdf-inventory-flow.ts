@@ -46,7 +46,7 @@ const importPdfInventoryFlow = ai.defineFlow(
   },
   async (input) => {
     const { output } = await ai.generate({
-      model: 'googleai/gemini-1.5-flash',
+      model: 'googleai/gemini-2.0-flash',
       prompt: [
         { media: { url: input.pdfDataUri, contentType: 'application/pdf' } },
         { text: `Actúa como un experto en gestión de inventarios y contabilidad. 
@@ -65,7 +65,7 @@ const importPdfInventoryFlow = ai.defineFlow(
     });
 
     if (!output) {
-      throw new Error("La IA no pudo procesar el contenido del PDF. Asegúrate de que el archivo sea legible.");
+      throw new Error("La IA no pudo procesar el contenido del PDF. Asegúrate de que el archivo sea legible y no esté protegido.");
     }
 
     return output;
