@@ -16,8 +16,7 @@ import {
   User,
   QrCode,
   CheckCircle2,
-  ChevronRight,
-  Package
+  ChevronRight
 } from "lucide-react";
 import { 
   Dialog, 
@@ -112,7 +111,7 @@ export default function POSPage() {
     }));
   };
 
-  const subtotal = cart.reduce((acc, item) => acc + (item.product.price * item.quantity), 0);
+  const subtotal = cart.reduce((acc, item) => acc + ((item.product.price || 0) * item.quantity), 0);
   const total = subtotal;
   const changeDue = Math.max(0, cashReceived - total);
 
@@ -168,8 +167,8 @@ export default function POSPage() {
             productId: item.product.id,
             productName: item.product.name,
             quantity: item.quantity,
-            unitPrice: item.product.price,
-            subtotal: item.product.price * item.quantity,
+            unitPrice: item.product.price || 0,
+            subtotal: (item.product.price || 0) * item.quantity,
           });
         });
       }
@@ -211,18 +210,17 @@ export default function POSPage() {
                     src={product.imageUrl || `https://picsum.photos/seed/${product.id}/300/200`} 
                     alt={product.name}
                     className="h-full w-full object-cover transition-transform group-hover:scale-110"
-                    data-ai-hint="product image"
                   />
                   <div className="absolute top-2 right-2">
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold shadow-sm ${product.stockQuantity < 10 ? 'bg-red-500 text-white' : 'bg-green-500 text-white'}`}>
-                      {product.stockQuantity} u.
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold shadow-sm ${ (product.stockQuantity || 0) < 10 ? 'bg-red-500 text-white' : 'bg-green-500 text-white'}`}>
+                      {product.stockQuantity || 0} u.
                     </span>
                   </div>
                 </div>
                 <CardContent className="p-3 flex flex-col justify-between space-y-2">
                   <div className="text-[9px] uppercase font-bold text-muted-foreground tracking-tighter">{product.category}</div>
                   <div className="font-semibold text-xs line-clamp-2 h-[32px]">{product.name}</div>
-                  <div className="text-primary font-bold text-base pt-1">${product.price.toLocaleString()}</div>
+                  <div className="text-primary font-bold text-base pt-1">${(product.price || 0).toLocaleString()}</div>
                 </CardContent>
               </Card>
             ))}
@@ -260,7 +258,7 @@ export default function POSPage() {
                     </div>
                     <div className="flex-1 space-y-1">
                       <div className="font-medium text-sm leading-tight line-clamp-1">{item.product.name}</div>
-                      <div className="text-xs text-muted-foreground">${item.product.price.toLocaleString()} c/u</div>
+                      <div className="text-xs text-muted-foreground">${(item.product.price || 0).toLocaleString()} c/u</div>
                     </div>
                     <div className="flex flex-col items-end gap-2">
                       <div className="flex items-center gap-2 bg-muted/50 rounded-full p-1">
@@ -283,7 +281,7 @@ export default function POSPage() {
                         </Button>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-xs">${(item.product.price * item.quantity).toLocaleString()}</span>
+                        <span className="font-bold text-xs">${((item.product.price || 0) * item.quantity).toLocaleString()}</span>
                         <Button 
                           variant="ghost" 
                           size="icon" 
@@ -391,7 +389,7 @@ export default function POSPage() {
                           ) : (
                             customers.map(customer => (
                               <SelectItem key={customer.id} value={customer.id}>
-                                {customer.name} (Saldo: ${customer.currentBalance?.toLocaleString()})
+                                {customer.name} (Saldo: ${ (customer.currentBalance || 0).toLocaleString()})
                               </SelectItem>
                             ))
                           )}

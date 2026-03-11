@@ -33,7 +33,6 @@ import {
   Trash2, 
   Upload, 
   Loader2, 
-  FileSpreadsheet, 
   LayoutGrid, 
   List, 
   Edit3, 
@@ -101,7 +100,6 @@ export default function InventoryPage() {
     p.sku?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Inicializar datos para edición masiva cuando se abre el diálogo
   useEffect(() => {
     if (isMassEditOpen) {
       setMassEditData(products.map(p => ({ ...p })));
@@ -114,8 +112,8 @@ export default function InventoryPage() {
 
     const formData = new FormData(e.currentTarget);
     const name = formData.get("name") as string;
-    const price = Number(formData.get("price"));
-    const stock = Number(formData.get("stock"));
+    const price = Number(formData.get("price") || 0);
+    const stock = Number(formData.get("stock") || 0);
     const imageUrl = formData.get("imageUrl") as string || `https://picsum.photos/seed/${name}/400/300`;
 
     const productData = {
@@ -154,13 +152,12 @@ export default function InventoryPage() {
     
     massEditData.forEach(p => {
       const original = products.find(op => op.id === p.id);
-      // Solo actualizar si algo cambió
-      if (original && (original.sku !== p.sku || original.price !== p.price || original.stockQuantity !== p.stockQuantity)) {
+      if (original && (original.sku !== p.sku || original.price !== Number(p.price) || original.stockQuantity !== Number(p.stockQuantity))) {
         const docRef = doc(firestore, "users", user.uid, "products", p.id);
         updateDocumentNonBlocking(docRef, {
           sku: p.sku || "",
-          price: Number(p.price),
-          stockQuantity: Number(p.stockQuantity),
+          price: Number(p.price || 0),
+          stockQuantity: Number(p.stockQuantity || 0),
           updatedAt: new Date().toISOString()
         });
       }
@@ -361,7 +358,6 @@ export default function InventoryPage() {
               </DialogContent>
             </Dialog>
 
-            {/* Dialog de Edición */}
             <Dialog open={!!editingProduct} onOpenChange={(open) => !open && setEditingProduct(null)}>
               <DialogContent className="sm:max-w-[425px]">
                 {editingProduct && (
@@ -443,7 +439,7 @@ export default function InventoryPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right font-black text-primary">
-                      ${product.price?.toLocaleString()}
+                      ${(product.price || 0).toLocaleString()}
                     </TableCell>
                     <TableCell className="text-right">
                       <span className={`px-2 py-1 rounded-full text-[11px] font-bold ${
@@ -490,15 +486,15 @@ export default function InventoryPage() {
                     className="h-full w-full object-cover transition-transform group-hover:scale-105"
                   />
                   <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">
-                    <Badge className={product.stockQuantity <= 5 ? 'bg-red-500' : 'bg-primary'}>
-                      {product.stockQuantity} unid.
+                    <Badge className={(product.stockQuantity || 0) <= 5 ? 'bg-red-500' : 'bg-primary'}>
+                      {product.stockQuantity || 0} unid.
                     </Badge>
                   </div>
                 </div>
                 <CardContent className="p-4 space-y-2">
                   <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{product.category}</span>
                   <h3 className="font-bold text-sm line-clamp-2 h-10">{product.name}</h3>
-                  <div className="text-xl font-black text-primary">${product.price?.toLocaleString()}</div>
+                  <div className="text-xl font-black text-primary">${(product.price || 0).toLocaleString()}</div>
                 </CardContent>
                 <CardFooter className="p-3 bg-muted/20 border-t flex justify-between gap-2">
                   <Button variant="outline" size="sm" className="flex-1 gap-2" onClick={() => {
