@@ -58,7 +58,7 @@ import { collection, doc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import * as XLSX from 'xlsx';
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
-import { Badge } from "@/badge";
+import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
