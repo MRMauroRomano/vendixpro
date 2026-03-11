@@ -40,7 +40,9 @@ import {
   MoreVertical,
   TableProperties,
   Save,
-  X
+  X,
+  CheckSquare,
+  AlertCircle
 } from "lucide-react";
 import { 
   useFirestore, 
@@ -63,6 +65,17 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export default function InventoryPage() {
   const firestore = useFirestore();
@@ -72,11 +85,13 @@ export default function InventoryPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isMassEditOpen, setIsMassEditOpen] = useState(false);
+  const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [viewMode, setViewMode] = useState<"grid" | "list">("list");
   const [massEditData, setMassEditData] = useState<any[]>([]);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const productsRef = useMemoFirebase(() => {
@@ -102,9 +117,13 @@ export default function InventoryPage() {
 
   useEffect(() => {
     if (isMassEditOpen) {
-      setMassEditData(products.map(p => ({ ...p })));
+      // Si hay seleccionados, solo editar esos. Si no, editar todos los filtrados.
+      const itemsToEdit = selectedIds.size > 0 
+        ? products.filter(p => selectedIds.has(p.id))
+        : filteredProducts;
+      setMassEditData(itemsToEdit.map(p => ({ ...p })));
     }
-  }, [isMassEditOpen, products]);
+  }, [isMassEditOpen, products, selectedIds, filteredProducts]);
 
   const handleSaveProduct = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -165,6 +184,7 @@ export default function InventoryPage() {
 
     toast({ title: "Cambios Guardados", description: "Se han actualizado los productos seleccionados." });
     setIsMassEditOpen(false);
+    setSelectedIds(new Set());
   };
 
   const handleDelete = (productId: string) => {
@@ -172,6 +192,44 @@ export default function InventoryPage() {
     const docRef = doc(firestore, "users", user.uid, "products", productId);
     deleteDocumentNonBlocking(docRef);
     toast({ title: "Producto Eliminado", description: "El producto ha sido removido." });
+    
+    const newSelected = new Set(selectedIds);
+    newSelected.delete(productId);
+    setSelectedIds(newSelected);
+  };
+
+  const handleBulkDelete = () => {
+    if (!user || !firestore || selectedIds.size === 0) return;
+    
+    selectedIds.forEach(id => {
+      const docRef = doc(firestore, "users", user.uid, "products", id);
+      deleteDocumentNonBlocking(docRef);
+    });
+
+    toast({ 
+      title: "Eliminación Masiva", 
+      description: `Se han eliminado ${selectedIds.size} productos.` 
+    });
+    setSelectedIds(new Set());
+    setIsConfirmDeleteOpen(false);
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredProducts.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredProducts.map(p => p.id)));
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    const newSelected = new Set(selectedIds);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedIds(newSelected);
   };
 
   const handleImportClick = () => {
@@ -381,6 +439,34 @@ export default function InventoryPage() {
           </div>
         </div>
 
+        {/* Barra de Acciones Masivas */}
+        {selectedIds.size > 0 && (
+          <div className="flex items-center justify-between bg-primary/5 border-2 border-primary/20 p-4 rounded-xl animate-in slide-in-from-top duration-300">
+            <div className="flex items-center gap-3">
+              <div className="bg-primary text-white p-2 rounded-lg">
+                <CheckSquare className="h-5 w-5" />
+              </div>
+              <div>
+                <span className="font-bold text-lg">{selectedIds.size}</span>
+                <span className="text-muted-foreground ml-2">productos seleccionados</span>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" className="gap-2" onClick={() => setIsMassEditOpen(true)}>
+                <Edit3 className="h-4 w-4" />
+                Editar Seleccionados
+              </Button>
+              <Button variant="destructive" className="gap-2" onClick={() => setIsConfirmDeleteOpen(true)}>
+                <Trash2 className="h-4 w-4" />
+                Eliminar Seleccionados
+              </Button>
+              <Button variant="ghost" size="icon" onClick={() => setSelectedIds(new Set())}>
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+          </div>
+        )}
+
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input 
@@ -407,6 +493,12 @@ export default function InventoryPage() {
             <Table>
               <TableHeader className="bg-muted/30">
                 <TableRow>
+                  <TableHead className="w-[40px]">
+                    <Checkbox 
+                      checked={selectedIds.size === filteredProducts.length && filteredProducts.length > 0} 
+                      onCheckedChange={toggleSelectAll}
+                    />
+                  </TableHead>
                   <TableHead className="w-[80px]">Imagen</TableHead>
                   <TableHead>Producto</TableHead>
                   <TableHead>Categoría</TableHead>
@@ -417,7 +509,13 @@ export default function InventoryPage() {
               </TableHeader>
               <TableBody>
                 {filteredProducts.map((product) => (
-                  <TableRow key={product.id} className="group hover:bg-muted/20">
+                  <TableRow key={product.id} className={`group hover:bg-muted/20 ${selectedIds.has(product.id) ? 'bg-primary/5' : ''}`}>
+                    <TableCell>
+                      <Checkbox 
+                        checked={selectedIds.has(product.id)} 
+                        onCheckedChange={() => toggleSelect(product.id)}
+                      />
+                    </TableCell>
                     <TableCell>
                       <div className="relative h-12 w-12 rounded-lg overflow-hidden bg-muted border shadow-inner">
                         <img 
@@ -478,8 +576,15 @@ export default function InventoryPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
             {filteredProducts.map((product) => (
-              <Card key={product.id} className="overflow-hidden hover:shadow-xl transition-all border-2 group">
+              <Card key={product.id} className={`overflow-hidden hover:shadow-xl transition-all border-2 group ${selectedIds.has(product.id) ? 'border-primary ring-2 ring-primary/20' : ''}`}>
                 <div className="relative aspect-video w-full overflow-hidden bg-muted border-b">
+                  <div className="absolute top-2 left-2 z-10">
+                    <Checkbox 
+                      checked={selectedIds.has(product.id)} 
+                      onCheckedChange={() => toggleSelect(product.id)}
+                      className="bg-white"
+                    />
+                  </div>
                   <img 
                     src={product.imageUrl || `https://picsum.photos/seed/${product.id}/400/300`} 
                     alt={product.name}
@@ -512,6 +617,27 @@ export default function InventoryPage() {
             ))}
           </div>
         )}
+
+        {/* Alerta de confirmación para borrado masivo */}
+        <AlertDialog open={isConfirmDeleteOpen} onOpenChange={setIsConfirmDeleteOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <div className="flex items-center gap-3 text-destructive mb-2">
+                <AlertCircle className="h-6 w-6" />
+                <AlertDialogTitle>¿Confirmar eliminación masiva?</AlertDialogTitle>
+              </div>
+              <AlertDialogDescription>
+                Estás a punto de eliminar <span className="font-bold">{selectedIds.size}</span> productos de forma permanente. Esta acción no se puede deshacer.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={handleBulkDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                Sí, eliminar todo
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </AppLayout>
   );
