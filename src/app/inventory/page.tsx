@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useRef, useEffect, useMemo } from "react";
@@ -43,7 +42,8 @@ import {
   Save,
   X,
   CheckSquare,
-  AlertCircle
+  AlertCircle,
+  FileText
 } from "lucide-react";
 import { 
   useFirestore, 
@@ -58,7 +58,7 @@ import { collection, doc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import * as XLSX from 'xlsx';
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -77,6 +77,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { importInventoryFromPdf } from "@/ai/flows/import-pdf-inventory-flow";
 
 export default function InventoryPage() {
   const firestore = useFirestore();
@@ -89,11 +90,13 @@ export default function InventoryPage() {
   const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any>(null);
   const [isImporting, setIsImporting] = useState(false);
+  const [isAiProcessing, setIsAiProcessing] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [viewMode, setViewMode] = useState<"grid" | "list">("list");
   const [massEditData, setMassEditData] = useState<any[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const pdfInputRef = useRef<HTMLInputElement>(null);
 
   const productsRef = useMemoFirebase(() => {
     if (!firestore || !user?.uid) return null;
@@ -108,11 +111,9 @@ export default function InventoryPage() {
   const { data: productsData, isLoading: isProductsLoading } = useCollection(productsRef);
   const { data: categoriesData } = useCollection(categoriesRef);
 
-  // Memoizar arreglos base para evitar recreación en cada renderizado
   const products = useMemo(() => productsData || [], [productsData]);
   const categories = useMemo(() => categoriesData || [], [categoriesData]);
 
-  // Memoizar productos filtrados para evitar bucles en useEffect
   const filteredProducts = useMemo(() => {
     return products.filter(p => 
       p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -122,7 +123,6 @@ export default function InventoryPage() {
 
   useEffect(() => {
     if (isMassEditOpen) {
-      // Si hay seleccionados, solo editar esos. Si no, editar todos los filtrados.
       const itemsToEdit = selectedIds.size > 0 
         ? products.filter(p => selectedIds.has(p.id))
         : filteredProducts;
@@ -241,6 +241,10 @@ export default function InventoryPage() {
     fileInputRef.current?.click();
   };
 
+  const handlePdfImportClick = () => {
+    pdfInputRef.current?.click();
+  };
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user || !productsRef) return;
@@ -283,6 +287,40 @@ export default function InventoryPage() {
     reader.readAsBinaryString(file);
   };
 
+  const handlePdfFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user || !productsRef) return;
+
+    setIsAiProcessing(true);
+    const reader = new FileReader();
+
+    reader.onload = async (evt) => {
+      try {
+        const base64 = evt.target?.result as string;
+        const result = await importInventoryFromPdf({ pdfDataUri: base64 });
+
+        if (result && result.products) {
+          result.products.forEach((prod: any) => {
+            const newProduct = {
+              ...prod,
+              imageUrl: `https://picsum.photos/seed/${prod.name}/400/300`,
+              createdAt: new Date().toISOString()
+            };
+            addDocumentNonBlocking(productsRef, newProduct);
+          });
+          toast({ title: "IA: Importación Exitosa", description: `Se detectaron y cargaron ${result.products.length} productos.` });
+        }
+      } catch (error) {
+        toast({ variant: "destructive", title: "Error de IA", description: "No se pudo procesar el PDF." });
+      } finally {
+        setIsAiProcessing(false);
+        if (pdfInputRef.current) pdfInputRef.current.value = "";
+      }
+    };
+
+    reader.readAsDataURL(file);
+  };
+
   return (
     <AppLayout>
       <div className="space-y-6">
@@ -293,6 +331,7 @@ export default function InventoryPage() {
           </div>
           <div className="flex flex-wrap gap-2">
             <input type="file" ref={fileInputRef} className="hidden" accept=".xlsx, .xls" onChange={handleFileChange} />
+            <input type="file" ref={pdfInputRef} className="hidden" accept=".pdf" onChange={handlePdfFileChange} />
             
             <div className="flex border rounded-md overflow-hidden bg-background mr-2 shadow-sm">
               <Button 
@@ -313,9 +352,14 @@ export default function InventoryPage() {
               </Button>
             </div>
 
+            <Button variant="outline" className="gap-2" onClick={handlePdfImportClick} disabled={isAiProcessing}>
+              {isAiProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
+              Importar PDF (IA)
+            </Button>
+
             <Button variant="outline" className="gap-2" onClick={handleImportClick} disabled={isImporting}>
               {isImporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-              Importar
+              Importar Excel
             </Button>
 
             <Dialog open={isMassEditOpen} onOpenChange={setIsMassEditOpen}>
@@ -444,7 +488,6 @@ export default function InventoryPage() {
           </div>
         </div>
 
-        {/* Barra de Acciones Masivas */}
         {selectedIds.size > 0 && (
           <div className="flex items-center justify-between bg-primary/5 border-2 border-primary/20 p-4 rounded-xl animate-in slide-in-from-top duration-300">
             <div className="flex items-center gap-3">
@@ -623,7 +666,6 @@ export default function InventoryPage() {
           </div>
         )}
 
-        {/* Alerta de confirmación para borrado masivo */}
         <AlertDialog open={isConfirmDeleteOpen} onOpenChange={setIsConfirmDeleteOpen}>
           <AlertDialogContent>
             <AlertDialogHeader>
