@@ -186,49 +186,51 @@ export default function POSPage() {
 
   return (
     <AppLayout>
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[calc(100vh-120px)] overflow-hidden">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[calc(100vh-140px)] overflow-hidden">
         {/* Productos: Sección Principal */}
         <div className="lg:col-span-8 flex flex-col space-y-4 overflow-hidden h-full">
           <div className="relative shrink-0">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input 
               placeholder="Buscar productos (nombre o SKU)..." 
-              className="pl-10 h-12 text-base shadow-sm"
+              className="pl-10 h-12 text-base shadow-sm bg-white"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
           
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 overflow-y-auto pr-2 pb-6 flex-1">
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 overflow-y-auto pr-2 pb-6 flex-1 custom-scrollbar">
             {filteredProducts.map(product => (
               <Card 
                 key={product.id} 
-                className="cursor-pointer hover:border-accent hover:shadow-lg transition-all border-2 group overflow-hidden"
+                className="cursor-pointer hover:border-accent hover:shadow-xl transition-all border-2 group overflow-hidden bg-card h-fit"
                 onClick={() => addToCart(product)}
               >
-                <div className="relative h-40 w-full overflow-hidden bg-muted">
+                <div className="relative aspect-video w-full overflow-hidden bg-muted">
                    <img 
                     src={product.imageUrl || `https://picsum.photos/seed/${product.id}/400/300`} 
                     alt={product.name}
-                    className="h-full w-full object-cover transition-transform group-hover:scale-105"
+                    className="h-full w-full object-cover transition-transform group-hover:scale-110"
                   />
                   <div className="absolute top-2 right-2">
-                    <span className={`text-[10px] px-2 py-1 rounded-full font-bold shadow-md ${ (product.stockQuantity || 0) < 10 ? 'bg-red-500 text-white' : 'bg-green-500 text-white'}`}>
-                      {product.stockQuantity || 0} disponibles
+                    <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold shadow-md ${ (product.stockQuantity || 0) < 10 ? 'bg-red-500 text-white' : 'bg-primary text-white'}`}>
+                      {product.stockQuantity || 0} u.
                     </span>
                   </div>
                 </div>
-                <CardContent className="p-4 space-y-2">
-                  <div className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">{product.category}</div>
-                  <div className="font-bold text-base line-clamp-1">{product.name}</div>
-                  <div className="text-primary font-black text-xl">${(product.price || 0).toLocaleString()}</div>
+                <CardContent className="p-3 space-y-1">
+                  <div className="text-[9px] uppercase font-bold text-muted-foreground tracking-widest">{product.category}</div>
+                  <div className="font-bold text-sm line-clamp-2 h-10 leading-tight">{product.name}</div>
+                  <div className="text-primary font-black text-lg">${(product.price || 0).toLocaleString()}</div>
                 </CardContent>
               </Card>
             ))}
-            {filteredProducts.length === 0 && !searchTerm && (
+            {filteredProducts.length === 0 && (
               <div className="col-span-full py-20 text-center opacity-20 flex flex-col items-center">
                 <ShoppingBag className="h-24 w-24 mb-4" />
-                <p className="text-lg font-medium">Cargue productos en el inventario para comenzar</p>
+                <p className="text-lg font-medium">
+                  {searchTerm ? "No se encontraron productos" : "Cargue productos en el inventario para comenzar"}
+                </p>
               </div>
             )}
           </div>
@@ -236,35 +238,35 @@ export default function POSPage() {
 
         {/* Carrito: Sección Lateral */}
         <Card className="lg:col-span-4 flex flex-col shadow-2xl overflow-hidden border-l-2 h-full bg-card">
-          <CardHeader className="py-4 px-6 border-b bg-muted/10 shrink-0">
+          <CardHeader className="py-4 px-6 border-b bg-muted/20 shrink-0">
             <div className="flex justify-between items-center">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <ShoppingBag className="h-5 w-5 text-primary" />
+              <CardTitle className="text-base flex items-center gap-2">
+                <ShoppingBag className="h-4 w-4 text-primary" />
                 Pedido Actual
               </CardTitle>
               <Button 
                 variant="ghost" 
                 size="sm" 
                 onClick={() => setCart([])} 
-                className="text-muted-foreground hover:bg-red-50 hover:text-red-500 text-xs"
+                className="text-muted-foreground hover:bg-red-50 hover:text-red-500 text-[10px] h-7"
                 disabled={cart.length === 0}
               >
-                Limpiar Todo
+                Limpiar
               </Button>
             </div>
           </CardHeader>
           
           <CardContent className="flex-1 overflow-y-auto p-0">
             {cart.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-8 text-center space-y-4 opacity-40">
-                <ShoppingBag className="h-12 w-12" />
-                <p className="text-sm font-medium italic">Seleccione productos para iniciar la venta</p>
+              <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-8 text-center space-y-4 opacity-30">
+                <ShoppingBag className="h-10 w-10" />
+                <p className="text-xs font-medium italic">Seleccione productos para iniciar</p>
               </div>
             ) : (
               <div className="divide-y divide-border/50">
                 {cart.map((item) => (
-                  <div key={item.product.id} className="p-4 flex gap-4 items-center group hover:bg-muted/20 transition-colors">
-                    <div className="h-12 w-12 rounded-lg border overflow-hidden bg-muted flex-shrink-0">
+                  <div key={item.product.id} className="p-3 flex gap-3 items-center group hover:bg-muted/10 transition-colors">
+                    <div className="h-10 w-10 rounded border overflow-hidden bg-muted flex-shrink-0">
                        <img 
                         src={item.product.imageUrl || `https://picsum.photos/seed/${item.product.id}/100/100`} 
                         alt={item.product.name}
@@ -272,38 +274,38 @@ export default function POSPage() {
                       />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="font-bold text-sm truncate">{item.product.name}</div>
-                      <div className="text-xs text-muted-foreground mt-0.5">${(item.product.price || 0).toLocaleString()} c/u</div>
+                      <div className="font-bold text-xs truncate">{item.product.name}</div>
+                      <div className="text-[10px] text-muted-foreground mt-0.5">${(item.product.price || 0).toLocaleString()} c/u</div>
                     </div>
-                    <div className="flex flex-col items-end gap-2">
-                      <div className="flex items-center gap-2 bg-muted/50 rounded-lg p-1 border">
+                    <div className="flex flex-col items-end gap-1">
+                      <div className="flex items-center gap-1.5 bg-muted/50 rounded p-0.5 border">
                         <Button 
                           variant="ghost" 
                           size="icon" 
-                          className="h-6 w-6 rounded-md hover:bg-background"
+                          className="h-5 w-5 rounded hover:bg-background"
                           onClick={() => updateQuantity(item.product.id, -1)}
                         >
-                          <Minus className="h-3 w-3" />
+                          <Minus className="h-2.5 w-2.5" />
                         </Button>
-                        <span className="w-6 text-center text-sm font-black">{item.quantity}</span>
+                        <span className="w-4 text-center text-xs font-bold">{item.quantity}</span>
                         <Button 
                           variant="ghost" 
                           size="icon" 
-                          className="h-6 w-6 rounded-md hover:bg-background"
+                          className="h-5 w-5 rounded hover:bg-background"
                           onClick={() => addToCart(item.product)}
                         >
-                          <Plus className="h-3 w-3" />
+                          <Plus className="h-2.5 w-2.5" />
                         </Button>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <span className="font-black text-sm text-primary">${((item.product.price || 0) * item.quantity).toLocaleString()}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-xs text-primary">${((item.product.price || 0) * item.quantity).toLocaleString()}</span>
                         <Button 
                           variant="ghost" 
                           size="icon" 
-                          className="h-6 w-6 text-muted-foreground hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="h-5 w-5 text-muted-foreground hover:text-red-500"
                           onClick={() => removeFromCart(item.product.id)}
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </div>
                     </div>
@@ -313,25 +315,25 @@ export default function POSPage() {
             )}
           </CardContent>
           
-          <CardFooter className="flex-col p-6 border-t bg-primary/5 gap-4 shrink-0">
+          <CardFooter className="flex-col p-5 border-t bg-primary/5 gap-3 shrink-0">
             <div className="w-full flex justify-between items-center">
-              <span className="text-sm font-bold text-muted-foreground">TOTAL A PAGAR</span>
-              <span className="text-3xl font-black text-primary">${total.toLocaleString()}</span>
+              <span className="text-xs font-bold text-muted-foreground uppercase">Total</span>
+              <span className="text-2xl font-black text-primary">${total.toLocaleString()}</span>
             </div>
             
             <Dialog open={isPaymentDialogOpen} onOpenChange={(open) => { setIsPaymentDialogOpen(open); if(!open) resetPayment(); }}>
               <DialogTrigger asChild>
-                <Button className="w-full h-14 text-lg font-black gap-2 shadow-xl" disabled={cart.length === 0}>
-                  REALIZAR PAGO
-                  <ChevronRight className="h-5 w-5" />
+                <Button className="w-full h-12 text-base font-black gap-2 shadow-lg" disabled={cart.length === 0}>
+                  PAGAR
+                  <ChevronRight className="h-4 w-4" />
                 </Button>
               </DialogTrigger>
-              <DialogContent className="sm:max-w-[500px]">
+              <DialogContent className="sm:max-w-[450px]">
                 <DialogHeader>
-                  <DialogTitle className="text-2xl font-bold">Total: ${total.toLocaleString()}</DialogTitle>
+                  <DialogTitle className="text-xl font-bold">Total a Cobrar: ${total.toLocaleString()}</DialogTitle>
                 </DialogHeader>
 
-                <div className="space-y-6 py-4">
+                <div className="space-y-5 py-3">
                   <div className="grid grid-cols-4 gap-2">
                     {[
                       { id: "Efectivo", icon: Banknote, label: "Efectivo" },
@@ -342,31 +344,31 @@ export default function POSPage() {
                       <Button
                         key={method.id}
                         variant={paymentMethod === method.id ? "default" : "outline"}
-                        className="flex flex-col h-20 gap-2 border-2"
+                        className="flex flex-col h-16 gap-1 border-2"
                         onClick={() => { resetPayment(); setPaymentMethod(method.id); }}
                       >
-                        <method.icon className="h-6 w-6" />
-                        <span className="text-[10px] font-bold uppercase">{method.label}</span>
+                        <method.icon className="h-5 w-5" />
+                        <span className="text-[9px] font-bold uppercase">{method.label}</span>
                       </Button>
                     ))}
                   </div>
 
                   {paymentMethod === "Efectivo" && (
-                    <div className="space-y-4 p-4 bg-muted/30 rounded-lg border-2 border-dashed">
-                      <div className="space-y-2">
-                        <label className="text-sm font-bold">Monto Recibido</label>
+                    <div className="space-y-3 p-4 bg-muted/30 rounded-lg border-2 border-dashed">
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold">Monto Recibido</label>
                         <Input 
                           type="number" 
-                          className="text-2xl font-bold h-14"
+                          className="text-xl font-bold h-12"
                           placeholder="0.00"
                           autoFocus
                           value={cashReceived || ""}
                           onChange={(e) => setCashReceived(Number(e.target.value))}
                         />
                       </div>
-                      <div className="flex justify-between items-center p-4 bg-background rounded-md border">
-                        <span className="text-lg font-medium">Vuelto:</span>
-                        <span className={`text-3xl font-black ${changeDue > 0 ? 'text-accent' : 'text-muted-foreground'}`}>
+                      <div className="flex justify-between items-center p-3 bg-background rounded border">
+                        <span className="text-sm font-medium">Vuelto:</span>
+                        <span className={`text-2xl font-black ${changeDue > 0 ? 'text-accent' : 'text-muted-foreground'}`}>
                           ${changeDue.toLocaleString()}
                         </span>
                       </div>
@@ -374,17 +376,17 @@ export default function POSPage() {
                   )}
 
                   {paymentMethod === "Tarjeta" && (
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-2 gap-3">
                       <Button 
                         variant={cardType === "Debito" ? "default" : "outline"}
-                        className="h-16 text-lg font-bold"
+                        className="h-12 font-bold"
                         onClick={() => setCardType("Debito")}
                       >
                         Débito
                       </Button>
                       <Button 
                         variant={cardType === "Credito" ? "default" : "outline"}
-                        className="h-16 text-lg font-bold"
+                        className="h-12 font-bold"
                         onClick={() => setCardType("Credito")}
                       >
                         Crédito
@@ -393,10 +395,10 @@ export default function POSPage() {
                   )}
 
                   {paymentMethod === "Cuenta Corriente" && (
-                    <div className="space-y-2">
-                      <label className="text-sm font-bold">Seleccionar Cliente</label>
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold">Seleccionar Cliente</label>
                       <Select value={selectedCustomerId} onValueChange={setSelectedCustomerId}>
-                        <SelectTrigger className="h-12">
+                        <SelectTrigger className="h-11">
                           <SelectValue placeholder="Buscar cliente..." />
                         </SelectTrigger>
                         <SelectContent>
@@ -415,12 +417,12 @@ export default function POSPage() {
                   )}
                 </div>
 
-                <DialogFooter className="sm:justify-between gap-4 mt-4">
-                  <Button variant="outline" onClick={() => setIsPaymentDialogOpen(false)} className="flex-1">
+                <DialogFooter className="sm:justify-between gap-3 mt-2">
+                  <Button variant="outline" onClick={() => setIsPaymentDialogOpen(false)} className="flex-1 h-11">
                     Cancelar
                   </Button>
                   <Button 
-                    className="flex-1 h-12 text-lg font-bold gap-2"
+                    className="flex-1 h-11 text-base font-bold gap-2"
                     disabled={
                       !paymentMethod || 
                       (paymentMethod === "Efectivo" && cashReceived < total) ||
@@ -429,8 +431,8 @@ export default function POSPage() {
                     }
                     onClick={handleCompleteSale}
                   >
-                    <CheckCircle2 className="h-5 w-5" />
-                    Confirmar Pago
+                    <CheckCircle2 className="h-4 w-4" />
+                    Confirmar
                   </Button>
                 </DialogFooter>
               </DialogContent>
