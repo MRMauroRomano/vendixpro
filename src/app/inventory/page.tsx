@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useRef, useEffect, useMemo } from "react";
@@ -43,7 +44,8 @@ import {
   X,
   CheckSquare,
   AlertCircle,
-  FileText
+  FileText,
+  Info
 } from "lucide-react";
 import { 
   useFirestore, 
@@ -78,6 +80,12 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { importInventoryFromPdf } from "@/ai/flows/import-pdf-inventory-flow";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 export default function InventoryPage() {
   const firestore = useFirestore();
@@ -260,24 +268,30 @@ export default function InventoryPage() {
         const ws = wb.Sheets[wsname];
         const data = XLSX.utils.sheet_to_json(ws);
 
+        if (data.length === 0) {
+          toast({ variant: "destructive", title: "Archivo Vacío", description: "El Excel no contiene datos procesables." });
+          return;
+        }
+
+        // Mapeo inteligente de columnas
         data.forEach((row: any) => {
-          const prodName = row.Nombre || row.name || row.Producto || "Producto Importado";
+          const prodName = row.Nombre || row.name || row.Producto || row.NAME || row.ITEM || "Producto Importado";
           const newProduct = {
             name: prodName,
-            price: Number(row.Precio || row.price || 0),
-            stockQuantity: Number(row.Stock || row.stockQuantity || 0),
-            category: row.Categoría || row.category || "General",
-            provider: row.Proveedor || row.provider || "",
-            sku: row.SKU || row.sku || `SKU-${Math.random().toString(36).substr(2, 9)}`,
-            imageUrl: row.Imagen || row.imageUrl || `https://picsum.photos/seed/${prodName}/400/300`,
+            price: Number(row.Precio || row.price || row.PRECIO || row.COST || row.Monto || 0),
+            stockQuantity: Number(row.Stock || row.stockQuantity || row.STOCK || row.QTY || row.Cantidad || 0),
+            category: row.Categoría || row.category || row.CATEGORIA || row.Rubro || "General",
+            provider: row.Proveedor || row.provider || row.PROVEEDOR || "",
+            sku: row.SKU || row.sku || row.Codigo || row.CODE || `SKU-${Math.random().toString(36).substr(2, 9)}`,
+            imageUrl: row.Imagen || row.imageUrl || row.IMAGEN || row.URL || `https://picsum.photos/seed/${prodName}/400/300`,
             createdAt: new Date().toISOString()
           };
           addDocumentNonBlocking(productsRef, newProduct);
         });
 
-        toast({ title: "Importación Finalizada", description: `Se procesaron ${data.length} productos.` });
+        toast({ title: "Importación Finalizada", description: `Se procesaron ${data.length} productos exitosamente.` });
       } catch (error) {
-        toast({ variant: "destructive", title: "Error", description: "Error al procesar el Excel." });
+        toast({ variant: "destructive", title: "Error", description: "Error al procesar el Excel. Verifique que sea un archivo .xlsx válido." });
       } finally {
         setIsImporting(false);
         if (fileInputRef.current) fileInputRef.current.value = "";
@@ -357,10 +371,25 @@ export default function InventoryPage() {
               Importar PDF (IA)
             </Button>
 
-            <Button variant="outline" className="gap-2" onClick={handleImportClick} disabled={isImporting}>
-              {isImporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-              Importar Excel
-            </Button>
+            <div className="flex gap-1">
+              <Button variant="outline" className="gap-2" onClick={handleImportClick} disabled={isImporting}>
+                {isImporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                Importar Excel
+              </Button>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-10 w-10 text-muted-foreground">
+                      <Info className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <p className="font-bold mb-1">Columnas sugeridas:</p>
+                    <p className="text-xs">Nombre, Precio, Stock, SKU, Categoría, Proveedor.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
 
             <Dialog open={isMassEditOpen} onOpenChange={setIsMassEditOpen}>
               <DialogTrigger asChild>
