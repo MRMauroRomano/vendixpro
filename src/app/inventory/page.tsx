@@ -274,11 +274,9 @@ export default function InventoryPage() {
           return;
         }
 
-        // Función de normalización de strings (quitar acentos, espacios y pasar a mayúsculas)
         const normalize = (str: string) => 
           str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
 
-        // Función auxiliar robusta para buscar valores ignorando formato
         const getVal = (row: any, searchKeys: string[]) => {
           const rowKeys = Object.keys(row);
           const normalizedSearchKeys = searchKeys.map(normalize);
@@ -700,7 +698,10 @@ export default function InventoryPage() {
                   </div>
                 </div>
                 <CardContent className="p-4 space-y-2">
-                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{product.category}</span>
+                  <div className="flex justify-between items-start">
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{product.category}</span>
+                    <span className="text-[9px] font-mono text-muted-foreground bg-muted px-1 rounded">{product.sku}</span>
+                  </div>
                   <h3 className="font-bold text-sm line-clamp-2 h-10">{product.name}</h3>
                   <div className="text-xl font-black text-primary">${(product.price || 0).toLocaleString()}</div>
                 </CardContent>
