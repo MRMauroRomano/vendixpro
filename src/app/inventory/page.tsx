@@ -274,17 +274,24 @@ export default function InventoryPage() {
           return;
         }
 
+        // Función auxiliar para buscar valores en diferentes variantes de nombres de columnas
+        const getVal = (row: any, keys: string[]) => {
+          for (const key of keys) {
+            if (row[key] !== undefined) return row[key];
+          }
+          return undefined;
+        };
+
         data.forEach((row: any) => {
-          // Mapeo inteligente con soporte para mayúsculas exactas del usuario (NOMBRE, CODIGO, etc)
-          const prodName = row.NOMBRE || row.Nombre || row.name || row.Producto || row.NAME || row.ITEM || "Producto Importado";
+          const prodName = getVal(row, ["NOMBRE", "Nombre", "nombre", "NAME", "name", "Producto", "ITEM"]) || "Producto Importado";
           const newProduct = {
             name: prodName,
-            price: Number(row.PRECIO || row.Precio || row.price || row.COST || row.Monto || 0),
-            stockQuantity: Number(row.STOCK || row.Stock || row.stockQuantity || row.QTY || row.Cantidad || 0),
-            category: row.CATEGORIA || row.Categoría || row.category || row.Rubro || "General",
-            provider: row.PROVEEDOR || row.Proveedor || row.provider || "",
-            sku: row.CODIGO || row.SKU || row.sku || row.Codigo || row.CODE || `SKU-${Math.random().toString(36).substr(2, 9)}`,
-            imageUrl: row.Imagen || row.imageUrl || row.IMAGEN || row.URL || `https://picsum.photos/seed/${prodName}/400/300`,
+            price: Number(getVal(row, ["PRECIO", "Precio", "precio", "price", "COST", "Monto"]) || 0),
+            stockQuantity: Number(getVal(row, ["STOCK", "Stock", "stock", "QTY", "Cantidad", "cantidad"]) || 0),
+            category: getVal(row, ["CATEGORIA", "Categoría", "categoria", "category", "Rubro"]) || "General",
+            provider: getVal(row, ["PROVEEDOR", "Proveedor", "proveedor", "provider"]) || "",
+            sku: getVal(row, ["CODIGO", "Código", "codigo", "SKU", "sku", "CODE", "code"]) || `SKU-${Math.random().toString(36).substr(2, 9)}`,
+            imageUrl: getVal(row, ["Imagen", "imageUrl", "IMAGEN", "URL", "url"]) || `https://picsum.photos/seed/${prodName}/400/300`,
             createdAt: new Date().toISOString()
           };
           addDocumentNonBlocking(productsRef, newProduct);
@@ -388,10 +395,10 @@ export default function InventoryPage() {
                     <div className="space-y-3">
                       <p className="font-bold border-b pb-1">Encabezados aceptados:</p>
                       <ul className="text-xs space-y-1.5 list-disc pl-4">
-                        <li><strong>Nombre:</strong> NOMBRE, name, Producto, Item...</li>
-                        <li><strong>Precio:</strong> PRECIO, price, Cost, Monto...</li>
+                        <li><strong>Nombre:</strong> NOMBRE, Nombre, Producto, Item...</li>
+                        <li><strong>Precio:</strong> PRECIO, Precio, price, Cost, Monto...</li>
                         <li><strong>Stock:</strong> STOCK, Cantidad, Qty, stockQuantity...</li>
-                        <li><strong>SKU:</strong> CODIGO, SKU, Codigo, Code...</li>
+                        <li><strong>Código/SKU:</strong> CODIGO, Código, codigo, SKU, SKU, Code...</li>
                         <li><strong>Categoría:</strong> CATEGORIA, Rubro, Category...</li>
                       </ul>
                       <p className="text-[10px] text-muted-foreground italic">El sistema reconoce mayúsculas, minúsculas y variaciones comunes.</p>
