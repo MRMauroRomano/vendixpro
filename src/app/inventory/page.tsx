@@ -69,7 +69,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   AlertDialog,
@@ -453,8 +453,8 @@ export default function InventoryPage() {
                   Modificación Masiva
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-6xl max-h-[90vh] flex flex-col p-0 overflow-hidden">
-                <DialogHeader className="p-6 border-b flex flex-row items-center justify-between">
+              <DialogContent className="max-w-6xl w-[95vw] h-[85vh] flex flex-col p-0 overflow-hidden">
+                <DialogHeader className="p-6 border-b flex flex-row items-center justify-between shrink-0">
                   <DialogTitle className="text-2xl font-bold flex items-center gap-2">
                     <TableProperties className="h-6 w-6" />
                     Edición Rápida de Inventario
@@ -464,17 +464,17 @@ export default function InventoryPage() {
                     Descargar (Excel)
                   </Button>
                 </DialogHeader>
-                <div className="flex-1 overflow-hidden">
-                  <ScrollArea className="h-full">
+                <div className="flex-1 min-h-0 relative">
+                  <ScrollArea className="h-full w-full">
                     <div className="p-6">
-                      <Table>
-                        <TableHeader>
+                      <Table className="min-w-[800px]">
+                        <TableHeader className="sticky top-0 bg-background z-10 shadow-sm">
                           <TableRow>
-                            <TableHead>Producto</TableHead>
-                            <TableHead className="w-[180px]">SKU / Código</TableHead>
+                            <TableHead className="w-[200px]">Producto</TableHead>
+                            <TableHead className="w-[150px]">SKU / Código</TableHead>
                             <TableHead className="w-[120px]">Precio ($)</TableHead>
                             <TableHead className="w-[100px]">Stock (U)</TableHead>
-                            <TableHead className="min-w-[200px]">Imagen (URL)</TableHead>
+                            <TableHead className="w-[300px]">Imagen (URL)</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -482,7 +482,7 @@ export default function InventoryPage() {
                             <TableRow key={p.id}>
                               <TableCell className="font-medium">
                                 <div className="flex flex-col">
-                                  <span className="text-sm truncate max-w-[200px]">{p.name}</span>
+                                  <span className="text-sm truncate max-w-[180px]">{p.name}</span>
                                   <span className="text-[10px] text-muted-foreground uppercase">{p.category}</span>
                                 </div>
                               </TableCell>
@@ -515,7 +515,7 @@ export default function InventoryPage() {
                                   <Input 
                                     value={p.imageUrl || ""} 
                                     onChange={(e) => handleMassUpdateChange(p.id, 'imageUrl', e.target.value)}
-                                    className="h-8 text-xs font-mono"
+                                    className="h-8 text-[10px] font-mono flex-1 max-w-[220px]"
                                     placeholder="https://..."
                                   />
                                   <div className="h-8 w-8 rounded border bg-muted flex-shrink-0 flex items-center justify-center overflow-hidden">
@@ -532,9 +532,10 @@ export default function InventoryPage() {
                         </TableBody>
                       </Table>
                     </div>
+                    <ScrollBar orientation="horizontal" />
                   </ScrollArea>
                 </div>
-                <DialogFooter className="p-6 border-t bg-muted/20 gap-2">
+                <DialogFooter className="p-6 border-t bg-muted/20 gap-2 shrink-0">
                   <Button variant="outline" onClick={() => setIsMassEditOpen(false)} className="gap-2">
                     <X className="h-4 w-4" />
                     Cancelar
