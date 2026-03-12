@@ -46,7 +46,8 @@ import {
   AlertCircle,
   FileText,
   Info,
-  Download
+  Download,
+  Image as ImageIcon
 } from "lucide-react";
 import { 
   useFirestore, 
@@ -185,12 +186,18 @@ export default function InventoryPage() {
     
     massEditData.forEach(p => {
       const original = products.find(op => op.id === p.id);
-      if (original && (original.sku !== p.sku || original.price !== Number(p.price) || original.stockQuantity !== Number(p.stockQuantity))) {
+      if (original && (
+        original.sku !== p.sku || 
+        original.price !== Number(p.price) || 
+        original.stockQuantity !== Number(p.stockQuantity) ||
+        original.imageUrl !== p.imageUrl
+      )) {
         const docRef = doc(firestore, "users", user.uid, "products", p.id);
         updateDocumentNonBlocking(docRef, {
           sku: p.sku || "",
           price: Number(p.price || 0),
           stockQuantity: Number(p.stockQuantity || 0),
+          imageUrl: p.imageUrl || "",
           updatedAt: new Date().toISOString()
         });
       }
@@ -422,7 +429,7 @@ export default function InventoryPage() {
                   Modificación Masiva
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0 overflow-hidden">
+              <DialogContent className="max-w-6xl max-h-[90vh] flex flex-col p-0 overflow-hidden">
                 <DialogHeader className="p-6 border-b">
                   <DialogTitle className="text-2xl font-bold flex items-center gap-2">
                     <TableProperties className="h-6 w-6" />
@@ -439,6 +446,7 @@ export default function InventoryPage() {
                             <TableHead className="w-[180px]">SKU / Código</TableHead>
                             <TableHead className="w-[120px]">Precio ($)</TableHead>
                             <TableHead className="w-[100px]">Stock (U)</TableHead>
+                            <TableHead className="min-w-[200px]">Imagen (URL)</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -473,6 +481,23 @@ export default function InventoryPage() {
                                   onChange={(e) => handleMassUpdateChange(p.id, 'stockQuantity', e.target.value)}
                                   className={`h-8 text-xs text-right font-bold ${Number(p.stockQuantity) <= 5 ? 'text-red-500' : ''}`}
                                 />
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-2">
+                                  <Input 
+                                    value={p.imageUrl || ""} 
+                                    onChange={(e) => handleMassUpdateChange(p.id, 'imageUrl', e.target.value)}
+                                    className="h-8 text-xs font-mono"
+                                    placeholder="https://..."
+                                  />
+                                  <div className="h-8 w-8 rounded border bg-muted flex-shrink-0 flex items-center justify-center overflow-hidden">
+                                    {p.imageUrl ? (
+                                      <img src={p.imageUrl} alt="" className="h-full w-full object-cover" />
+                                    ) : (
+                                      <ImageIcon className="h-4 w-4 text-muted-foreground opacity-30" />
+                                    )}
+                                  </div>
+                                </div>
                               </TableCell>
                             </TableRow>
                           ))}
