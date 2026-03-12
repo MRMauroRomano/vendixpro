@@ -200,14 +200,14 @@ export default function POSPage() {
             />
           </div>
           
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 overflow-y-auto pr-2 pb-6 flex-1 custom-scrollbar">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 overflow-y-auto pr-2 pb-6 flex-1 custom-scrollbar">
             {filteredProducts.map(product => (
               <Card 
                 key={product.id} 
-                className="cursor-pointer hover:shadow-xl transition-all border-2 group overflow-hidden bg-card h-fit"
+                className="cursor-pointer hover:shadow-xl transition-all border-2 group overflow-hidden bg-card h-fit flex flex-col"
                 onClick={() => addToCart(product)}
               >
-                <div className="relative aspect-video w-full overflow-hidden bg-muted border-b">
+                <div className="relative aspect-video w-full overflow-hidden bg-muted border-b shrink-0">
                    <img 
                     src={product.imageUrl || `https://picsum.photos/seed/${product.id}/400/300`} 
                     alt={product.name}
@@ -215,23 +215,25 @@ export default function POSPage() {
                   />
                   <div className="absolute top-2 right-2">
                     <Badge className={`shadow-md ${(product.stockQuantity || 0) <= 5 ? 'bg-red-500' : 'bg-primary'}`}>
-                      {product.stockQuantity || 0} unid.
+                      {product.stockQuantity || 0} u.
                     </Badge>
                   </div>
                 </div>
-                <CardContent className="p-4 space-y-2">
-                  <div className="flex justify-between items-start">
-                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                      {product.category || "General"}
-                    </span>
-                    <span className="text-[9px] font-mono text-muted-foreground bg-muted px-1 rounded">
-                      {product.sku}
-                    </span>
+                <CardContent className="p-4 space-y-2 flex-1 flex flex-col justify-between">
+                  <div className="space-y-1">
+                    <div className="flex justify-between items-start gap-2">
+                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">
+                        {product.category || "General"}
+                      </span>
+                      <span className="text-[9px] font-mono text-muted-foreground bg-muted px-1 rounded shrink-0">
+                        {product.sku}
+                      </span>
+                    </div>
+                    <h3 className="font-bold text-sm line-clamp-2 h-10 leading-tight">
+                      {product.name}
+                    </h3>
                   </div>
-                  <h3 className="font-bold text-sm line-clamp-2 h-10 leading-tight">
-                    {product.name}
-                  </h3>
-                  <div className="text-xl font-black text-primary">
+                  <div className="text-xl font-black text-primary pt-2">
                     ${(product.price || 0).toLocaleString()}
                   </div>
                 </CardContent>
