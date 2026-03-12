@@ -274,24 +274,33 @@ export default function InventoryPage() {
           return;
         }
 
-        // Función auxiliar para buscar valores en diferentes variantes de nombres de columnas
-        const getVal = (row: any, keys: string[]) => {
-          for (const key of keys) {
-            if (row[key] !== undefined) return row[key];
+        // Función de normalización de strings (quitar acentos, espacios y pasar a mayúsculas)
+        const normalize = (str: string) => 
+          str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
+
+        // Función auxiliar robusta para buscar valores ignorando formato
+        const getVal = (row: any, searchKeys: string[]) => {
+          const rowKeys = Object.keys(row);
+          const normalizedSearchKeys = searchKeys.map(normalize);
+
+          for (const rowKey of rowKeys) {
+            if (normalizedSearchKeys.includes(normalize(rowKey))) {
+              return row[rowKey];
+            }
           }
           return undefined;
         };
 
         data.forEach((row: any) => {
-          const prodName = getVal(row, ["NOMBRE", "Nombre", "nombre", "NAME", "name", "Producto", "ITEM"]) || "Producto Importado";
+          const prodName = getVal(row, ["NOMBRE", "PRODUCTO", "NAME", "ITEM", "DESCRIPCION"]) || "Producto Importado";
           const newProduct = {
             name: prodName,
-            price: Number(getVal(row, ["PRECIO", "Precio", "precio", "price", "COST", "Monto"]) || 0),
-            stockQuantity: Number(getVal(row, ["STOCK", "Stock", "stock", "QTY", "Cantidad", "cantidad"]) || 0),
-            category: getVal(row, ["CATEGORIA", "Categoría", "categoria", "category", "Rubro"]) || "General",
-            provider: getVal(row, ["PROVEEDOR", "Proveedor", "proveedor", "provider"]) || "",
-            sku: getVal(row, ["CODIGO", "Código", "codigo", "SKU", "sku", "CODE", "code"]) || `SKU-${Math.random().toString(36).substr(2, 9)}`,
-            imageUrl: getVal(row, ["Imagen", "imageUrl", "IMAGEN", "URL", "url"]) || `https://picsum.photos/seed/${prodName}/400/300`,
+            price: Number(getVal(row, ["PRECIO", "PRICE", "COSTO", "COST", "MONTO", "VENTA"]) || 0),
+            stockQuantity: Number(getVal(row, ["STOCK", "CANTIDAD", "QTY", "UNIDADES"]) || 0),
+            category: getVal(row, ["CATEGORIA", "RUBRO", "CATEGORY", "DEPARTAMENTO"]) || "General",
+            provider: getVal(row, ["PROVEEDOR", "PROVIDER", "MARCA"]) || "",
+            sku: getVal(row, ["CODIGO", "SKU", "CODE", "REFERENCIA"]) || `SKU-${Math.random().toString(36).substr(2, 9)}`,
+            imageUrl: getVal(row, ["IMAGEN", "URL", "IMAGEURL", "FOTO"]) || `https://picsum.photos/seed/${prodName}/400/300`,
             createdAt: new Date().toISOString()
           };
           addDocumentNonBlocking(productsRef, newProduct);
@@ -395,13 +404,13 @@ export default function InventoryPage() {
                     <div className="space-y-3">
                       <p className="font-bold border-b pb-1">Encabezados aceptados:</p>
                       <ul className="text-xs space-y-1.5 list-disc pl-4">
-                        <li><strong>Nombre:</strong> NOMBRE, Nombre, Producto, Item...</li>
-                        <li><strong>Precio:</strong> PRECIO, Precio, price, Cost, Monto...</li>
-                        <li><strong>Stock:</strong> STOCK, Cantidad, Qty, stockQuantity...</li>
-                        <li><strong>Código/SKU:</strong> CODIGO, Código, codigo, SKU, SKU, Code...</li>
+                        <li><strong>Nombre:</strong> NOMBRE, Producto, Item, Descripcion...</li>
+                        <li><strong>Precio:</strong> PRECIO, Price, Venta, Costo, Monto...</li>
+                        <li><strong>Stock:</strong> STOCK, Cantidad, Qty, Unidades...</li>
+                        <li><strong>Código/SKU:</strong> CODIGO, SKU, Code, Referencia...</li>
                         <li><strong>Categoría:</strong> CATEGORIA, Rubro, Category...</li>
                       </ul>
-                      <p className="text-[10px] text-muted-foreground italic">El sistema reconoce mayúsculas, minúsculas y variaciones comunes.</p>
+                      <p className="text-[10px] text-muted-foreground italic">El sistema reconoce mayúsculas, minúsculas y variaciones comunes sin importar acentos.</p>
                     </div>
                   </TooltipContent>
                 </Tooltip>
