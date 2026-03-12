@@ -45,7 +45,8 @@ import {
   CheckSquare,
   AlertCircle,
   FileText,
-  Info
+  Info,
+  Download
 } from "lucide-react";
 import { 
   useFirestore, 
@@ -273,7 +274,6 @@ export default function InventoryPage() {
           return;
         }
 
-        // Mapeo inteligente de columnas
         data.forEach((row: any) => {
           const prodName = row.Nombre || row.name || row.Producto || row.NAME || row.ITEM || "Producto Importado";
           const newProduct = {
@@ -383,9 +383,20 @@ export default function InventoryPage() {
                       <Info className="h-4 w-4" />
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent className="max-w-xs">
-                    <p className="font-bold mb-1">Columnas sugeridas:</p>
-                    <p className="text-xs">Nombre, Precio, Stock, SKU, Categoría, Proveedor.</p>
+                  <TooltipContent className="max-w-xs p-4">
+                    <div className="space-y-3">
+                      <p className="font-bold border-b pb-1">Encabezados aceptados:</p>
+                      <ul className="text-xs space-y-1.5 list-disc pl-4">
+                        <li><strong>Nombre:</strong> Producto, Item, Name, ITEM NAME...</li>
+                        <li><strong>Precio:</strong> Precio, Price, Cost, Monto...</li>
+                        <li><strong>Stock:</strong> Stock, Cantidad, Qty, stockQuantity...</li>
+                        <li><strong>SKU:</strong> SKU, Codigo, Code...</li>
+                        <li><strong>Categoría:</strong> Categoría, Rubro, Category...</li>
+                        <li><strong>Proveedor:</strong> Proveedor, Provider...</li>
+                        <li><strong>Imagen:</strong> Imagen, URL, imageUrl...</li>
+                      </ul>
+                      <p className="text-[10px] text-muted-foreground italic">El sistema es inteligente y reconoce variaciones de mayúsculas y acentos.</p>
+                    </div>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
