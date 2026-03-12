@@ -208,6 +208,30 @@ export default function InventoryPage() {
     setSelectedIds(new Set());
   };
 
+  const handleExportExcel = () => {
+    if (massEditData.length === 0) {
+      toast({ variant: "destructive", title: "Error", description: "No hay datos para exportar." });
+      return;
+    }
+
+    const exportRows = massEditData.map(p => ({
+      'NOMBRE': p.name,
+      'CODIGO': p.sku,
+      'PRECIO': p.price,
+      'STOCK': p.stockQuantity,
+      'CATEGORIA': p.category,
+      'PROVEEDOR': p.provider || "",
+      'IMAGEN': p.imageUrl || ""
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportRows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Inventario");
+    XLSX.writeFile(wb, "Inventario_VendixPro.xlsx");
+
+    toast({ title: "Descarga Exitosa", description: "El archivo Excel se ha generado correctamente." });
+  };
+
   const handleDelete = (productId: string) => {
     if (!user || !firestore) return;
     const docRef = doc(firestore, "users", user.uid, "products", productId);
@@ -282,7 +306,7 @@ export default function InventoryPage() {
         }
 
         const normalize = (str: string) => 
-          str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
+          str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim() : "";
 
         const getVal = (row: any, searchKeys: string[]) => {
           const rowKeys = Object.keys(row);
@@ -430,11 +454,15 @@ export default function InventoryPage() {
                 </Button>
               </DialogTrigger>
               <DialogContent className="max-w-6xl max-h-[90vh] flex flex-col p-0 overflow-hidden">
-                <DialogHeader className="p-6 border-b">
+                <DialogHeader className="p-6 border-b flex flex-row items-center justify-between">
                   <DialogTitle className="text-2xl font-bold flex items-center gap-2">
                     <TableProperties className="h-6 w-6" />
                     Edición Rápida de Inventario
                   </DialogTitle>
+                  <Button variant="outline" size="sm" className="gap-2" onClick={handleExportExcel}>
+                    <Download className="h-4 w-4" />
+                    Descargar (Excel)
+                  </Button>
                 </DialogHeader>
                 <div className="flex-1 overflow-hidden">
                   <ScrollArea className="h-full">
