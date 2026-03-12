@@ -205,7 +205,7 @@ export default function POSPage() {
             {filteredProducts.map(product => (
               <Card 
                 key={product.id} 
-                className="cursor-pointer hover:shadow-xl transition-all border-2 group overflow-hidden bg-card flex flex-col h-fit"
+                className="cursor-pointer hover:shadow-xl transition-all border-2 group overflow-hidden bg-card flex flex-col h-fit min-h-[280px]"
                 onClick={() => addToCart(product)}
               >
                 <div className="relative aspect-video w-full overflow-hidden bg-muted border-b shrink-0">
@@ -221,7 +221,7 @@ export default function POSPage() {
                   </div>
                 </div>
                 <CardContent className="p-4 space-y-2 flex-1 flex flex-col">
-                  <div className="flex justify-between items-start gap-2 h-4">
+                  <div className="flex justify-between items-start gap-2 h-4 mb-1">
                     <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">
                       {product.category || "General"}
                     </span>
@@ -229,10 +229,10 @@ export default function POSPage() {
                       {product.sku}
                     </span>
                   </div>
-                  <h3 className="font-bold text-sm line-clamp-2 h-10 leading-tight">
+                  <h3 className="font-bold text-sm line-clamp-2 leading-tight h-10">
                     {product.name}
                   </h3>
-                  <div className="text-xl font-black text-primary mt-auto">
+                  <div className="text-xl font-black text-primary mt-auto pt-2">
                     ${(product.price || 0).toLocaleString()}
                   </div>
                 </CardContent>
@@ -250,7 +250,7 @@ export default function POSPage() {
         </div>
 
         {/* Carrito: Sección Lateral */}
-        <Card className="lg:col-span-4 flex flex-col shadow-2xl overflow-hidden border-l-2 h-full bg-card">
+        <Card className="lg:col-span-4 flex flex-col shadow-2xl overflow-hidden border-l-2 h-full bg-card max-w-[400px]">
           <CardHeader className="py-4 px-6 border-b bg-muted/20 shrink-0">
             <div className="flex justify-between items-center">
               <CardTitle className="text-base flex items-center gap-2">
