@@ -18,7 +18,7 @@ import {
   DialogContent, 
   DialogHeader, 
   DialogTitle, 
-  DialogTrigger,
+  DialogTrigger, 
   DialogFooter
 } from "@/components/ui/dialog";
 import {
@@ -275,14 +275,15 @@ export default function InventoryPage() {
         }
 
         data.forEach((row: any) => {
-          const prodName = row.Nombre || row.name || row.Producto || row.NAME || row.ITEM || "Producto Importado";
+          // Mapeo inteligente con soporte para mayúsculas exactas del usuario (NOMBRE, CODIGO, etc)
+          const prodName = row.NOMBRE || row.Nombre || row.name || row.Producto || row.NAME || row.ITEM || "Producto Importado";
           const newProduct = {
             name: prodName,
-            price: Number(row.Precio || row.price || row.PRECIO || row.COST || row.Monto || 0),
-            stockQuantity: Number(row.Stock || row.stockQuantity || row.STOCK || row.QTY || row.Cantidad || 0),
-            category: row.Categoría || row.category || row.CATEGORIA || row.Rubro || "General",
-            provider: row.Proveedor || row.provider || row.PROVEEDOR || "",
-            sku: row.SKU || row.sku || row.Codigo || row.CODE || `SKU-${Math.random().toString(36).substr(2, 9)}`,
+            price: Number(row.PRECIO || row.Precio || row.price || row.COST || row.Monto || 0),
+            stockQuantity: Number(row.STOCK || row.Stock || row.stockQuantity || row.QTY || row.Cantidad || 0),
+            category: row.CATEGORIA || row.Categoría || row.category || row.Rubro || "General",
+            provider: row.PROVEEDOR || row.Proveedor || row.provider || "",
+            sku: row.CODIGO || row.SKU || row.sku || row.Codigo || row.CODE || `SKU-${Math.random().toString(36).substr(2, 9)}`,
             imageUrl: row.Imagen || row.imageUrl || row.IMAGEN || row.URL || `https://picsum.photos/seed/${prodName}/400/300`,
             createdAt: new Date().toISOString()
           };
@@ -387,15 +388,13 @@ export default function InventoryPage() {
                     <div className="space-y-3">
                       <p className="font-bold border-b pb-1">Encabezados aceptados:</p>
                       <ul className="text-xs space-y-1.5 list-disc pl-4">
-                        <li><strong>Nombre:</strong> Producto, Item, Name, ITEM NAME...</li>
-                        <li><strong>Precio:</strong> Precio, Price, Cost, Monto...</li>
-                        <li><strong>Stock:</strong> Stock, Cantidad, Qty, stockQuantity...</li>
-                        <li><strong>SKU:</strong> SKU, Codigo, Code...</li>
-                        <li><strong>Categoría:</strong> Categoría, Rubro, Category...</li>
-                        <li><strong>Proveedor:</strong> Proveedor, Provider...</li>
-                        <li><strong>Imagen:</strong> Imagen, URL, imageUrl...</li>
+                        <li><strong>Nombre:</strong> NOMBRE, name, Producto, Item...</li>
+                        <li><strong>Precio:</strong> PRECIO, price, Cost, Monto...</li>
+                        <li><strong>Stock:</strong> STOCK, Cantidad, Qty, stockQuantity...</li>
+                        <li><strong>SKU:</strong> CODIGO, SKU, Codigo, Code...</li>
+                        <li><strong>Categoría:</strong> CATEGORIA, Rubro, Category...</li>
                       </ul>
-                      <p className="text-[10px] text-muted-foreground italic">El sistema es inteligente y reconoce variaciones de mayúsculas y acentos.</p>
+                      <p className="text-[10px] text-muted-foreground italic">El sistema reconoce mayúsculas, minúsculas y variaciones comunes.</p>
                     </div>
                   </TooltipContent>
                 </Tooltip>
