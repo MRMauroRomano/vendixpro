@@ -186,124 +186,124 @@ export default function POSPage() {
 
   return (
     <AppLayout>
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 h-[calc(100vh-120px)] overflow-hidden">
-        {/* Productos: Sección Principal (Más ancha) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[calc(100vh-120px)] overflow-hidden">
+        {/* Productos: Sección Principal */}
         <div className="lg:col-span-8 flex flex-col space-y-4 overflow-hidden h-full">
           <div className="relative shrink-0">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input 
               placeholder="Buscar productos (nombre o SKU)..." 
-              className="pl-10 h-10 text-sm shadow-sm"
+              className="pl-10 h-12 text-base shadow-sm"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
           
-          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 overflow-y-auto pr-1 pb-4 flex-1">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 overflow-y-auto pr-2 pb-6 flex-1">
             {filteredProducts.map(product => (
               <Card 
                 key={product.id} 
-                className="cursor-pointer hover:border-accent hover:shadow-md transition-all border group overflow-hidden h-fit"
+                className="cursor-pointer hover:border-accent hover:shadow-lg transition-all border-2 group overflow-hidden"
                 onClick={() => addToCart(product)}
               >
-                <div className="relative h-24 w-full overflow-hidden bg-muted border-b">
+                <div className="relative h-40 w-full overflow-hidden bg-muted">
                    <img 
-                    src={product.imageUrl || `https://picsum.photos/seed/${product.id}/200/150`} 
+                    src={product.imageUrl || `https://picsum.photos/seed/${product.id}/400/300`} 
                     alt={product.name}
-                    className="h-full w-full object-cover transition-transform group-hover:scale-110"
+                    className="h-full w-full object-cover transition-transform group-hover:scale-105"
                   />
-                  <div className="absolute top-1 right-1">
-                    <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold shadow-sm ${ (product.stockQuantity || 0) < 10 ? 'bg-red-500 text-white' : 'bg-green-500 text-white'}`}>
-                      {product.stockQuantity || 0} u.
+                  <div className="absolute top-2 right-2">
+                    <span className={`text-[10px] px-2 py-1 rounded-full font-bold shadow-md ${ (product.stockQuantity || 0) < 10 ? 'bg-red-500 text-white' : 'bg-green-500 text-white'}`}>
+                      {product.stockQuantity || 0} disponibles
                     </span>
                   </div>
                 </div>
-                <CardContent className="p-2 flex flex-col justify-between space-y-1">
-                  <div className="text-[8px] uppercase font-bold text-muted-foreground tracking-tighter truncate">{product.category}</div>
-                  <div className="font-semibold text-[11px] leading-tight line-clamp-2 h-[28px]">{product.name}</div>
-                  <div className="text-primary font-bold text-sm">${(product.price || 0).toLocaleString()}</div>
+                <CardContent className="p-4 space-y-2">
+                  <div className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">{product.category}</div>
+                  <div className="font-bold text-base line-clamp-1">{product.name}</div>
+                  <div className="text-primary font-black text-xl">${(product.price || 0).toLocaleString()}</div>
                 </CardContent>
               </Card>
             ))}
             {filteredProducts.length === 0 && !searchTerm && (
               <div className="col-span-full py-20 text-center opacity-20 flex flex-col items-center">
-                <ShoppingBag className="h-16 w-16 mb-2" />
-                <p>Cargue productos en el inventario para comenzar</p>
+                <ShoppingBag className="h-24 w-24 mb-4" />
+                <p className="text-lg font-medium">Cargue productos en el inventario para comenzar</p>
               </div>
             )}
           </div>
         </div>
 
-        {/* Carrito: Sección Lateral (Más pequeña y estática) */}
+        {/* Carrito: Sección Lateral */}
         <Card className="lg:col-span-4 flex flex-col shadow-2xl overflow-hidden border-l-2 h-full bg-card">
-          <CardHeader className="py-3 px-4 border-b bg-muted/10 shrink-0">
+          <CardHeader className="py-4 px-6 border-b bg-muted/10 shrink-0">
             <div className="flex justify-between items-center">
-              <CardTitle className="text-base flex items-center gap-2">
-                <ShoppingBag className="h-4 w-4 text-primary" />
-                Carrito
+              <CardTitle className="text-lg flex items-center gap-2">
+                <ShoppingBag className="h-5 w-5 text-primary" />
+                Pedido Actual
               </CardTitle>
               <Button 
                 variant="ghost" 
                 size="sm" 
                 onClick={() => setCart([])} 
-                className="text-muted-foreground h-7 px-2 hover:bg-red-50 hover:text-red-500 text-[10px]"
+                className="text-muted-foreground hover:bg-red-50 hover:text-red-500 text-xs"
                 disabled={cart.length === 0}
               >
-                Vaciar
+                Limpiar Todo
               </Button>
             </div>
           </CardHeader>
           
-          <CardContent className="flex-1 overflow-y-auto p-0 scrollbar-thin scrollbar-thumb-muted">
+          <CardContent className="flex-1 overflow-y-auto p-0">
             {cart.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-6 text-center space-y-3 opacity-30">
-                <ShoppingBag className="h-10 w-10" />
-                <p className="text-xs font-medium italic">Seleccione productos para vender</p>
+              <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-8 text-center space-y-4 opacity-40">
+                <ShoppingBag className="h-12 w-12" />
+                <p className="text-sm font-medium italic">Seleccione productos para iniciar la venta</p>
               </div>
             ) : (
               <div className="divide-y divide-border/50">
                 {cart.map((item) => (
-                  <div key={item.product.id} className="p-3 flex gap-3 items-center group hover:bg-muted/30 transition-colors">
-                    <div className="h-10 w-10 rounded border overflow-hidden bg-muted flex-shrink-0">
+                  <div key={item.product.id} className="p-4 flex gap-4 items-center group hover:bg-muted/20 transition-colors">
+                    <div className="h-12 w-12 rounded-lg border overflow-hidden bg-muted flex-shrink-0">
                        <img 
-                        src={item.product.imageUrl || `https://picsum.photos/seed/${item.product.id}/50/50`} 
+                        src={item.product.imageUrl || `https://picsum.photos/seed/${item.product.id}/100/100`} 
                         alt={item.product.name}
                         className="h-full w-full object-cover"
                       />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="font-bold text-[11px] leading-tight line-clamp-1">{item.product.name}</div>
-                      <div className="text-[10px] text-muted-foreground mt-0.5">${(item.product.price || 0).toLocaleString()}</div>
+                      <div className="font-bold text-sm truncate">{item.product.name}</div>
+                      <div className="text-xs text-muted-foreground mt-0.5">${(item.product.price || 0).toLocaleString()} c/u</div>
                     </div>
-                    <div className="flex flex-col items-end gap-1.5">
-                      <div className="flex items-center gap-1.5 bg-muted/50 rounded-md p-0.5 border">
+                    <div className="flex flex-col items-end gap-2">
+                      <div className="flex items-center gap-2 bg-muted/50 rounded-lg p-1 border">
                         <Button 
                           variant="ghost" 
                           size="icon" 
-                          className="h-5 w-5 rounded-sm hover:bg-background"
+                          className="h-6 w-6 rounded-md hover:bg-background"
                           onClick={() => updateQuantity(item.product.id, -1)}
                         >
-                          <Minus className="h-2.5 w-2.5" />
+                          <Minus className="h-3 w-3" />
                         </Button>
-                        <span className="w-4 text-center text-[10px] font-black">{item.quantity}</span>
+                        <span className="w-6 text-center text-sm font-black">{item.quantity}</span>
                         <Button 
                           variant="ghost" 
                           size="icon" 
-                          className="h-5 w-5 rounded-sm hover:bg-background"
+                          className="h-6 w-6 rounded-md hover:bg-background"
                           onClick={() => addToCart(item.product)}
                         >
-                          <Plus className="h-2.5 w-2.5" />
+                          <Plus className="h-3 w-3" />
                         </Button>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-black text-[11px] text-primary">${((item.product.price || 0) * item.quantity).toLocaleString()}</span>
+                      <div className="flex items-center gap-3">
+                        <span className="font-black text-sm text-primary">${((item.product.price || 0) * item.quantity).toLocaleString()}</span>
                         <Button 
                           variant="ghost" 
                           size="icon" 
-                          className="h-5 w-5 text-muted-foreground hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="h-6 w-6 text-muted-foreground hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
                           onClick={() => removeFromCart(item.product.id)}
                         >
-                          <Trash2 className="h-3 w-3" />
+                          <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
                     </div>
@@ -313,22 +313,22 @@ export default function POSPage() {
             )}
           </CardContent>
           
-          <CardFooter className="flex-col p-4 border-t bg-primary/5 gap-3 shrink-0">
-            <div className="w-full flex justify-between items-center text-xl font-black text-primary">
-              <span className="text-xs font-bold text-muted-foreground">TOTAL</span>
-              <span>${total.toLocaleString()}</span>
+          <CardFooter className="flex-col p-6 border-t bg-primary/5 gap-4 shrink-0">
+            <div className="w-full flex justify-between items-center">
+              <span className="text-sm font-bold text-muted-foreground">TOTAL A PAGAR</span>
+              <span className="text-3xl font-black text-primary">${total.toLocaleString()}</span>
             </div>
             
             <Dialog open={isPaymentDialogOpen} onOpenChange={(open) => { setIsPaymentDialogOpen(open); if(!open) resetPayment(); }}>
               <DialogTrigger asChild>
-                <Button className="w-full h-12 text-base font-black gap-2 shadow-lg" disabled={cart.length === 0}>
-                  COBRAR
-                  <ChevronRight className="h-4 w-4" />
+                <Button className="w-full h-14 text-lg font-black gap-2 shadow-xl" disabled={cart.length === 0}>
+                  REALIZAR PAGO
+                  <ChevronRight className="h-5 w-5" />
                 </Button>
               </DialogTrigger>
               <DialogContent className="sm:max-w-[500px]">
                 <DialogHeader>
-                  <DialogTitle className="text-2xl font-bold">Total a Cobrar: ${total.toLocaleString()}</DialogTitle>
+                  <DialogTitle className="text-2xl font-bold">Total: ${total.toLocaleString()}</DialogTitle>
                 </DialogHeader>
 
                 <div className="space-y-6 py-4">
