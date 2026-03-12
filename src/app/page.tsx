@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { AppLayout } from "@/components/layout/app-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
@@ -11,7 +11,8 @@ import {
   AlertTriangle,
   ArrowUpRight,
   ArrowDownRight,
-  Loader2
+  Loader2,
+  ShoppingBag
 } from "lucide-react";
 import { 
   BarChart, 
@@ -22,60 +23,90 @@ import {
   Tooltip, 
   ResponsiveContainer
 } from "recharts";
-
-const data = [
-  { name: "Lun", ventas: 4000, gastos: 2400 },
-  { name: "Mar", ventas: 3000, gastos: 1398 },
-  { name: "Mie", ventas: 2000, gastos: 9800 },
-  { name: "Jue", ventas: 2780, gastos: 3908 },
-  { name: "Vie", ventas: 1890, gastos: 4800 },
-  { name: "Sab", ventas: 2390, gastos: 3800 },
-  { name: "Dom", ventas: 3490, gastos: 4300 },
-];
-
-const stats = [
-  {
-    title: "Ventas del Mes",
-    value: "$45,231.89",
-    change: "+20.1%",
-    trend: "up",
-    icon: TrendingUp,
-    color: "text-accent"
-  },
-  {
-    title: "Gastos Operativos",
-    value: "$12,302.45",
-    change: "+4.5%",
-    trend: "up",
-    icon: TrendingDown,
-    color: "text-red-500"
-  },
-  {
-    title: "Stock Total",
-    value: "1,204",
-    change: "-2.4%",
-    trend: "down",
-    icon: Package,
-    color: "text-blue-500"
-  },
-  {
-    title: "Bajo Stock",
-    value: "12",
-    change: "Alerta Crítica",
-    trend: "neutral",
-    icon: AlertTriangle,
-    color: "text-orange-500"
-  }
-];
+import { useFirestore, useUser, useMemoFirebase, useCollection } from "@/firebase";
+import { collection, query, orderBy, limit } from "firebase/firestore";
 
 export default function DashboardPage() {
   const [mounted, setMounted] = useState(false);
+  const firestore = useFirestore();
+  const { user } = useUser();
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  if (!mounted) {
+  const productsRef = useMemoFirebase(() => {
+    if (!firestore || !user?.uid) return null;
+    return collection(firestore, "users", user.uid, "products");
+  }, [firestore, user?.uid]);
+
+  const salesRef = useMemoFirebase(() => {
+    if (!firestore || !user?.uid) return null;
+    return query(collection(firestore, "users", user.uid, "sales"), orderBy("createdAt", "desc"), limit(100));
+  }, [firestore, user?.uid]);
+
+  const expensesRef = useMemoFirebase(() => {
+    if (!firestore || !user?.uid) return null;
+    return collection(firestore, "users", user.uid, "expenses");
+  }, [firestore, user?.uid]);
+
+  const { data: products } = useCollection(productsRef);
+  const { data: sales } = useCollection(salesRef);
+  const { data: expenses } = useCollection(expensesRef);
+
+  const stats = useMemo(() => {
+    const totalSales = (sales || []).reduce((acc, sale) => acc + (sale.totalAmount || 0), 0);
+    const totalExpenses = (expenses || []).reduce((acc, exp) => acc + (exp.amount || 0), 0);
+    const totalStock = (products || []).reduce((acc, prod) => acc + (prod.stockQuantity || 0), 0);
+    const lowStockCount = (products || []).filter(p => (p.stockQuantity || 0) <= 5).length;
+
+    return [
+      {
+        title: "Ventas Totales",
+        value: `$${totalSales.toLocaleString()}`,
+        change: `${(sales || []).length} ventas`,
+        trend: "up",
+        icon: TrendingUp,
+        color: "text-accent"
+      },
+      {
+        title: "Gastos Registrados",
+        value: `$${totalExpenses.toLocaleString()}`,
+        change: `${(expenses || []).length} registros`,
+        trend: "up",
+        icon: TrendingDown,
+        color: "text-red-500"
+      },
+      {
+        title: "Stock Total",
+        value: totalStock.toLocaleString(),
+        change: "Unidades en almacén",
+        trend: "neutral",
+        icon: Package,
+        color: "text-blue-500"
+      },
+      {
+        title: "Bajo Stock",
+        value: lowStockCount.toString(),
+        change: "Requieren reposición",
+        trend: lowStockCount > 0 ? "down" : "neutral",
+        icon: AlertTriangle,
+        color: "text-orange-500"
+      }
+    ];
+  }, [sales, expenses, products]);
+
+  // Datos para el gráfico (basados en las últimas ventas)
+  const chartData = useMemo(() => {
+    // Agrupar ventas por día si es posible, o simplemente mostrar los últimos montos
+    return (sales || []).slice(0, 7).reverse().map((sale, i) => ({
+      name: `Venta ${i + 1}`,
+      ventas: sale.totalAmount || 0,
+      gastos: 0 // Simplificado para el MVP
+    }));
+  }, [sales]);
+
+  if (!mounted || !user) {
     return (
       <AppLayout>
         <div className="flex items-center justify-center min-h-[60vh]">
@@ -90,7 +121,7 @@ export default function DashboardPage() {
       <div className="space-y-8">
         <div>
           <h1 className="text-3xl font-bold font-headline">Dashboard de Rendimiento</h1>
-          <p className="text-muted-foreground">Bienvenido de nuevo, administrador.</p>
+          <p className="text-muted-foreground">Visualización real de tu negocio.</p>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -103,12 +134,7 @@ export default function DashboardPage() {
               <CardContent>
                 <div className="text-2xl font-bold">{stat.value}</div>
                 <div className="flex items-center text-xs text-muted-foreground mt-1">
-                  {stat.trend === "up" ? (
-                    <ArrowUpRight className="h-3 w-3 text-accent mr-1" />
-                  ) : stat.trend === "down" ? (
-                    <ArrowDownRight className="h-3 w-3 text-red-500 mr-1" />
-                  ) : null}
-                  {stat.change} desde el mes pasado
+                  {stat.change}
                 </div>
               </CardContent>
             </Card>
@@ -118,47 +144,56 @@ export default function DashboardPage() {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
           <Card className="col-span-4">
             <CardHeader>
-              <CardTitle>Resumen Semanal de Operaciones</CardTitle>
+              <CardTitle>Rendimiento de Últimas Ventas</CardTitle>
             </CardHeader>
             <CardContent className="pl-2">
               <div className="h-[350px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={data}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="name" />
-                    <YAxis />
-                    <Tooltip 
-                      contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                    />
-                    <Bar dataKey="ventas" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="gastos" fill="hsl(var(--accent))" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
+                {chartData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis dataKey="name" />
+                      <YAxis />
+                      <Tooltip 
+                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                      />
+                      <Bar dataKey="ventas" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex items-center justify-center h-full text-muted-foreground italic">
+                    No hay ventas suficientes para mostrar el gráfico.
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
+          
           <Card className="col-span-3">
             <CardHeader>
-              <CardTitle>Productos con Stock Crítico</CardTitle>
+              <CardTitle>Productos Críticos</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {[
-                  { name: "Cerveza Quilmes 1L", stock: 2, limit: 10 },
-                  { name: "Pan de Molde Lactal", stock: 5, limit: 20 },
-                  { name: "Leche Entera La Serenísima", stock: 3, limit: 15 },
-                  { name: "Yerba Mate Taragüi 500g", stock: 1, limit: 12 },
-                ].map((item) => (
-                  <div key={item.name} className="flex items-center justify-between space-x-4">
-                    <div className="flex flex-col space-y-1">
-                      <span className="text-sm font-medium">{item.name}</span>
-                      <span className="text-xs text-muted-foreground">Mínimo sugerido: {item.limit}</span>
+                {(products || [])
+                  .filter(p => (p.stockQuantity || 0) <= 5)
+                  .slice(0, 5)
+                  .map((item) => (
+                    <div key={item.id} className="flex items-center justify-between space-x-4">
+                      <div className="flex flex-col space-y-1">
+                        <span className="text-sm font-medium truncate max-w-[150px]">{item.name}</span>
+                        <span className="text-[10px] text-muted-foreground uppercase">{item.category}</span>
+                      </div>
+                      <div className="text-sm font-bold text-red-500">
+                        {item.stockQuantity} u.
+                      </div>
                     </div>
-                    <div className="text-sm font-bold text-red-500">
-                      {item.stock} u.
-                    </div>
+                  ))}
+                {(!products || products.filter(p => (p.stockQuantity || 0) <= 5).length === 0) && (
+                  <div className="text-center py-10 opacity-30 italic text-sm">
+                    Sin alertas de stock.
                   </div>
-                ))}
+                )}
               </div>
             </CardContent>
           </Card>

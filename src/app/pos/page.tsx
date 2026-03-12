@@ -40,9 +40,10 @@ import {
   useFirestore, 
   useUser, 
   useMemoFirebase,
-  addDocumentNonBlocking 
+  addDocumentNonBlocking,
+  updateDocumentNonBlocking
 } from "@/firebase";
-import { collection, serverTimestamp } from "firebase/firestore";
+import { collection, serverTimestamp, doc } from "firebase/firestore";
 import { Badge } from "@/components/ui/badge";
 
 interface CartItem {
@@ -125,7 +126,7 @@ export default function POSPage() {
   };
 
   const handleCompleteSale = () => {
-    if (!user || cart.length === 0 || !paymentMethod) return;
+    if (!user || cart.length === 0 || !paymentMethod || !firestore) return;
     
     if (paymentMethod === "Efectivo" && cashReceived < total) {
       toast({
@@ -146,13 +147,8 @@ export default function POSPage() {
     }
 
     const saleData = {
-      saleDateTime: serverTimestamp(),
       totalAmount: total,
-      taxAmount: 0,
-      discountAmount: 0,
-      finalAmount: total,
       paymentMethod: paymentMethod === "Tarjeta" ? `Tarjeta ${cardType}` : paymentMethod,
-      status: "Completed",
       userId: user.uid,
       customerId: selectedCustomerId || null,
       notes: paymentMethod === "Efectivo" ? `Recibido: $${cashReceived} - Vuelto: $${changeDue}` : "",
@@ -160,10 +156,14 @@ export default function POSPage() {
     };
 
     const salesRef = collection(firestore, "users", user.uid, "sales");
+    
+    // Guardar la venta principal
     addDocumentNonBlocking(salesRef, saleData).then((saleRef) => {
       if (saleRef) {
         const saleItemsRef = collection(firestore, "users", user.uid, "sales", saleRef.id, "sale_items");
+        
         cart.forEach(item => {
+          // 1. Guardar el ítem de la venta
           addDocumentNonBlocking(saleItemsRef, {
             saleId: saleRef.id,
             productId: item.product.id,
@@ -171,6 +171,13 @@ export default function POSPage() {
             quantity: item.quantity,
             unitPrice: item.product.price || 0,
             subtotal: (item.product.price || 0) * item.quantity,
+          });
+
+          // 2. Descontar Stock automáticamente
+          const productDocRef = doc(firestore, "users", user.uid, "products", item.product.id);
+          const currentStock = item.product.stockQuantity || 0;
+          updateDocumentNonBlocking(productDocRef, {
+            stockQuantity: Math.max(0, currentStock - item.quantity)
           });
         });
       }

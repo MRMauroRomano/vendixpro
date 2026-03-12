@@ -1,3 +1,4 @@
+
 "use client";
 
 import { AppLayout } from "@/components/layout/app-layout";
@@ -12,9 +13,27 @@ import {
   TableRow 
 } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Search, Filter, Download, FileText, Calendar } from "lucide-react";
+import { Search, Filter, Download, FileText, Calendar, Loader2, ShoppingBag } from "lucide-react";
+import { useFirestore, useUser, useMemoFirebase, useCollection } from "@/firebase";
+import { collection, query, orderBy, limit } from "firebase/firestore";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
 
 export default function SalesHistoryPage() {
+  const firestore = useFirestore();
+  const { user } = useUser();
+
+  const salesRef = useMemoFirebase(() => {
+    if (!firestore || !user?.uid) return null;
+    return query(
+      collection(firestore, "users", user.uid, "sales"),
+      orderBy("createdAt", "desc"),
+      limit(50)
+    );
+  }, [firestore, user?.uid]);
+
+  const { data: sales, isLoading } = useCollection(salesRef);
+
   return (
     <AppLayout>
       <div className="space-y-6">
@@ -38,7 +57,7 @@ export default function SalesHistoryPage() {
         <div className="flex flex-col md:flex-row gap-4 items-center">
           <div className="relative flex-1 w-full">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Buscar por número de ticket o cliente..." className="pl-10" />
+            <Input placeholder="Buscar ventas..." className="pl-10" />
           </div>
           <Button variant="outline" className="gap-2 whitespace-nowrap">
             <Calendar className="h-4 w-4" />
@@ -52,44 +71,55 @@ export default function SalesHistoryPage() {
 
         <Card>
           <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Ticket #</TableHead>
-                  <TableHead>Fecha / Hora</TableHead>
-                  <TableHead>Metodo Pago</TableHead>
-                  <TableHead>Items</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
-                  <TableHead className="text-right">Acciones</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {[
-                  { id: "10523", date: "24/05/2024 18:45", method: "Efectivo", items: 4, total: 12500 },
-                  { id: "10522", date: "24/05/2024 17:30", method: "Tarjeta Visa", items: 2, total: 4200 },
-                  { id: "10521", date: "24/05/2024 15:10", method: "Efectivo", items: 8, total: 24300 },
-                  { id: "10520", date: "23/05/2024 20:20", method: "Cuenta Corriente", items: 3, total: 8900 },
-                  { id: "10519", date: "23/05/2024 19:45", method: "Tarjeta Master", items: 1, total: 1500 },
-                ].map((row) => (
-                  <TableRow key={row.id}>
-                    <TableCell className="font-mono text-xs font-bold">#{row.id}</TableCell>
-                    <TableCell>{row.date}</TableCell>
-                    <TableCell>
-                      <span className={`px-2 py-1 rounded-full text-[10px] font-semibold uppercase ${
-                        row.method === 'Cuenta Corriente' ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'
-                      }`}>
-                        {row.method}
-                      </span>
-                    </TableCell>
-                    <TableCell>{row.items} productos</TableCell>
-                    <TableCell className="text-right font-bold">${row.total.toLocaleString()}</TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="sm">Detalle</Button>
-                    </TableCell>
+            {isLoading ? (
+              <div className="p-24 flex flex-col items-center justify-center gap-4">
+                <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                <p className="text-muted-foreground">Cargando transacciones...</p>
+              </div>
+            ) : sales && sales.length > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>ID Venta</TableHead>
+                    <TableHead>Fecha / Hora</TableHead>
+                    <TableHead>Método Pago</TableHead>
+                    <TableHead className="text-right">Total</TableHead>
+                    <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {sales.map((sale) => (
+                    <TableRow key={sale.id}>
+                      <TableCell className="font-mono text-[10px] font-bold uppercase truncate max-w-[100px]">
+                        #{sale.id.substring(0, 8)}
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {sale.createdAt ? format(new Date(sale.createdAt), "dd/MM/yyyy HH:mm", { locale: es }) : '-'}
+                      </TableCell>
+                      <TableCell>
+                        <span className={`px-2 py-1 rounded-full text-[10px] font-semibold uppercase ${
+                          sale.paymentMethod === 'Cuenta Corriente' ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'
+                        }`}>
+                          {sale.paymentMethod}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right font-bold text-primary">
+                        ${(sale.totalAmount || 0).toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="ghost" size="sm">Ver Detalle</Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-24 text-muted-foreground">
+                <ShoppingBag className="h-16 w-16 opacity-10 mb-4" />
+                <p className="text-xl font-semibold">No hay ventas registradas</p>
+                <p className="text-sm">Las ventas que realices en el POS aparecerán aquí.</p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
