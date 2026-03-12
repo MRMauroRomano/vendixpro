@@ -42,6 +42,7 @@ import {
   addDocumentNonBlocking 
 } from "@/firebase";
 import { collection, serverTimestamp } from "firebase/firestore";
+import { Badge } from "@/components/ui/badge";
 
 interface CartItem {
   product: any;
@@ -199,29 +200,40 @@ export default function POSPage() {
             />
           </div>
           
-          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 overflow-y-auto pr-2 pb-6 flex-1 custom-scrollbar">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 overflow-y-auto pr-2 pb-6 flex-1 custom-scrollbar">
             {filteredProducts.map(product => (
               <Card 
                 key={product.id} 
-                className="cursor-pointer hover:border-accent hover:shadow-xl transition-all border-2 group overflow-hidden bg-card h-fit"
+                className="cursor-pointer hover:shadow-xl transition-all border-2 group overflow-hidden bg-card h-fit"
                 onClick={() => addToCart(product)}
               >
-                <div className="relative aspect-video w-full overflow-hidden bg-muted">
+                <div className="relative aspect-video w-full overflow-hidden bg-muted border-b">
                    <img 
                     src={product.imageUrl || `https://picsum.photos/seed/${product.id}/400/300`} 
                     alt={product.name}
-                    className="h-full w-full object-cover transition-transform group-hover:scale-110"
+                    className="h-full w-full object-cover transition-transform group-hover:scale-105"
                   />
                   <div className="absolute top-2 right-2">
-                    <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold shadow-md ${ (product.stockQuantity || 0) < 10 ? 'bg-red-500 text-white' : 'bg-primary text-white'}`}>
-                      {product.stockQuantity || 0} u.
-                    </span>
+                    <Badge className={`shadow-md ${(product.stockQuantity || 0) <= 5 ? 'bg-red-500' : 'bg-primary'}`}>
+                      {product.stockQuantity || 0} unid.
+                    </Badge>
                   </div>
                 </div>
-                <CardContent className="p-3 space-y-1">
-                  <div className="text-[9px] uppercase font-bold text-muted-foreground tracking-widest">{product.category}</div>
-                  <div className="font-bold text-sm line-clamp-2 h-10 leading-tight">{product.name}</div>
-                  <div className="text-primary font-black text-lg">${(product.price || 0).toLocaleString()}</div>
+                <CardContent className="p-4 space-y-2">
+                  <div className="flex justify-between items-start">
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                      {product.category || "General"}
+                    </span>
+                    <span className="text-[9px] font-mono text-muted-foreground bg-muted px-1 rounded">
+                      {product.sku}
+                    </span>
+                  </div>
+                  <h3 className="font-bold text-sm line-clamp-2 h-10 leading-tight">
+                    {product.name}
+                  </h3>
+                  <div className="text-xl font-black text-primary">
+                    ${(product.price || 0).toLocaleString()}
+                  </div>
                 </CardContent>
               </Card>
             ))}
