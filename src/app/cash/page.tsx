@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useMemo } from "react";
@@ -58,13 +57,19 @@ export default function CashControlPage() {
   const [openingAmount, setOpeningAmount] = useState<number>(0);
   const [actualCash, setActualCash] = useState<number>(0);
 
-  // Consultas
-  const sessionsRef = useMemoFirebase(() => {
+  // Referencias base para escrituras
+  const sessionsBaseRef = useMemoFirebase(() => {
     if (!firestore || !user?.uid) return null;
-    return query(collection(firestore, "users", user.uid, "cash_sessions"), orderBy("openedAt", "desc"), limit(20));
+    return collection(firestore, "users", user.uid, "cash_sessions");
   }, [firestore, user?.uid]);
 
-  const { data: sessions, isLoading: sessionsLoading } = useCollection(sessionsRef);
+  // Consultas para lectura
+  const sessionsQuery = useMemoFirebase(() => {
+    if (!sessionsBaseRef) return null;
+    return query(sessionsBaseRef, orderBy("openedAt", "desc"), limit(20));
+  }, [sessionsBaseRef]);
+
+  const { data: sessions, isLoading: sessionsLoading } = useCollection(sessionsQuery);
   
   // Buscar sesión abierta
   const activeSession = useMemo(() => {
@@ -72,7 +77,7 @@ export default function CashControlPage() {
   }, [sessions]);
 
   // Consultar ventas y gastos DESDE la apertura de la sesión activa
-  const salesRef = useMemoFirebase(() => {
+  const salesQuery = useMemoFirebase(() => {
     if (!firestore || !user?.uid || !activeSession) return null;
     return query(
       collection(firestore, "users", user.uid, "sales"),
@@ -80,7 +85,7 @@ export default function CashControlPage() {
     );
   }, [firestore, user?.uid, activeSession]);
 
-  const expensesRef = useMemoFirebase(() => {
+  const expensesQuery = useMemoFirebase(() => {
     if (!firestore || !user?.uid || !activeSession) return null;
     return query(
       collection(firestore, "users", user.uid, "expenses"),
@@ -88,8 +93,8 @@ export default function CashControlPage() {
     );
   }, [firestore, user?.uid, activeSession]);
 
-  const { data: currentSales } = useCollection(salesRef);
-  const { data: currentExpenses } = useCollection(expensesRef);
+  const { data: currentSales } = useCollection(salesQuery);
+  const { data: currentExpenses } = useCollection(expensesQuery);
 
   // Cálculos de la sesión actual
   const stats = useMemo(() => {
@@ -108,7 +113,7 @@ export default function CashControlPage() {
   }, [activeSession, currentSales, currentExpenses]);
 
   const handleOpenCash = () => {
-    if (!user || !sessionsRef) return;
+    if (!user || !sessionsBaseRef) return;
 
     const newSession = {
       userId: user.uid,
@@ -121,7 +126,7 @@ export default function CashControlPage() {
       notes: ""
     };
 
-    addDocumentNonBlocking(sessionsRef, newSession);
+    addDocumentNonBlocking(sessionsBaseRef, newSession);
     toast({ title: "Caja Abierta", description: `Se inició el turno con $${openingAmount.toLocaleString()}.` });
     setIsOpeningDialogOpen(false);
     setOpeningAmount(0);

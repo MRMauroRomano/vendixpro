@@ -42,7 +42,7 @@ import {
   addDocumentNonBlocking,
   updateDocumentNonBlocking
 } from "@/firebase";
-import { collection, serverTimestamp, doc } from "firebase/firestore";
+import { collection, doc } from "firebase/firestore";
 import { Badge } from "@/components/ui/badge";
 
 interface CartItem {
@@ -61,7 +61,7 @@ export default function POSPage() {
   
   const [paymentMethod, setPaymentMethod] = useState<string>("");
   const [cashReceived, setCashReceived] = useState<number>(0);
-  const [cardType, setCardType] =("Debito" | "Credito" | "")("");
+  const [cardType, setCardType] = useState<"Debito" | "Credito" | "">("");
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
 
   const productsRef = useMemoFirebase(() => {
