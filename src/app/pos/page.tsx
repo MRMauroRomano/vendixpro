@@ -1,7 +1,6 @@
-
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { AppLayout } from "@/components/layout/app-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -62,7 +61,7 @@ export default function POSPage() {
   
   const [paymentMethod, setPaymentMethod] = useState<string>("");
   const [cashReceived, setCashReceived] = useState<number>(0);
-  const [cardType, setCardType] = useState<"Debito" | "Credito" | "">("");
+  const [cardType, setCardType] =("Debito" | "Credito" | "")("");
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
 
   const productsRef = useMemoFirebase(() => {
@@ -81,10 +80,13 @@ export default function POSPage() {
   const products = productsData || [];
   const customers = customersData || [];
 
-  const filteredProducts = products.filter(p => 
-    p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (p.sku && p.sku.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const filteredProducts = useMemo(() => {
+    const term = searchTerm.toLowerCase();
+    return products.filter(p => 
+      String(p.name || "").toLowerCase().includes(term) ||
+      String(p.sku || "").toLowerCase().includes(term)
+    );
+  }, [products, searchTerm]);
 
   const addToCart = (product: any) => {
     setCart(prev => {
@@ -157,13 +159,11 @@ export default function POSPage() {
 
     const salesRef = collection(firestore, "users", user.uid, "sales");
     
-    // Guardar la venta principal
     addDocumentNonBlocking(salesRef, saleData).then((saleRef) => {
       if (saleRef) {
         const saleItemsRef = collection(firestore, "users", user.uid, "sales", saleRef.id, "sale_items");
         
         cart.forEach(item => {
-          // 1. Guardar el ítem de la venta
           addDocumentNonBlocking(saleItemsRef, {
             saleId: saleRef.id,
             productId: item.product.id,
@@ -173,7 +173,6 @@ export default function POSPage() {
             subtotal: (item.product.price || 0) * item.quantity,
           });
 
-          // 2. Descontar Stock automáticamente
           const productDocRef = doc(firestore, "users", user.uid, "products", item.product.id);
           const currentStock = item.product.stockQuantity || 0;
           updateDocumentNonBlocking(productDocRef, {
@@ -196,7 +195,6 @@ export default function POSPage() {
   return (
     <AppLayout>
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[calc(100vh-140px)] overflow-hidden">
-        {/* Productos: Sección Principal */}
         <div className="lg:col-span-8 flex flex-col space-y-4 overflow-hidden h-full">
           <div className="relative shrink-0">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -256,7 +254,6 @@ export default function POSPage() {
           </div>
         </div>
 
-        {/* Carrito: Sección Lateral */}
         <Card className="lg:col-span-4 flex flex-col shadow-2xl overflow-hidden border-l-2 h-full bg-card max-w-[400px]">
           <CardHeader className="py-4 px-6 border-b bg-muted/20 shrink-0">
             <div className="flex justify-between items-center">

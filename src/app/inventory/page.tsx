@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useRef, useEffect, useMemo } from "react";
@@ -125,9 +124,10 @@ export default function InventoryPage() {
   const categories = useMemo(() => categoriesData || [], [categoriesData]);
 
   const filteredProducts = useMemo(() => {
+    const term = searchTerm.toLowerCase();
     return products.filter(p => 
-      p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.sku?.toLowerCase().includes(searchTerm.toLowerCase())
+      String(p.name || "").toLowerCase().includes(term) ||
+      String(p.sku || "").toLowerCase().includes(term)
     );
   }, [products, searchTerm]);
 
@@ -194,7 +194,7 @@ export default function InventoryPage() {
       )) {
         const docRef = doc(firestore, "users", user.uid, "products", p.id);
         updateDocumentNonBlocking(docRef, {
-          sku: p.sku || "",
+          sku: String(p.sku || ""),
           price: Number(p.price || 0),
           stockQuantity: Number(p.stockQuantity || 0),
           imageUrl: p.imageUrl || "",
@@ -321,15 +321,15 @@ export default function InventoryPage() {
         };
 
         data.forEach((row: any) => {
-          const prodName = getVal(row, ["NOMBRE", "PRODUCTO", "NAME", "ITEM", "DESCRIPCION"]) || "Producto Importado";
+          const prodName = String(getVal(row, ["NOMBRE", "PRODUCTO", "NAME", "ITEM", "DESCRIPCION"]) || "Producto Importado");
           const newProduct = {
             name: prodName,
             price: Number(getVal(row, ["PRECIO", "PRICE", "COSTO", "COST", "MONTO", "VENTA"]) || 0),
             stockQuantity: Number(getVal(row, ["STOCK", "CANTIDAD", "QTY", "UNIDADES"]) || 0),
-            category: getVal(row, ["CATEGORIA", "RUBRO", "CATEGORY", "DEPARTAMENTO"]) || "General",
-            provider: getVal(row, ["PROVEEDOR", "PROVIDER", "MARCA"]) || "",
-            sku: getVal(row, ["CODIGO", "SKU", "CODE", "REFERENCIA"]) || `SKU-${Math.random().toString(36).substr(2, 9)}`,
-            imageUrl: getVal(row, ["IMAGEN", "URL", "IMAGEURL", "FOTO"]) || `https://picsum.photos/seed/${prodName}/400/300`,
+            category: String(getVal(row, ["CATEGORIA", "RUBRO", "CATEGORY", "DEPARTAMENTO"]) || "General"),
+            provider: String(getVal(row, ["PROVEEDOR", "PROVIDER", "MARCA"]) || ""),
+            sku: String(getVal(row, ["CODIGO", "SKU", "CODE", "REFERENCIA"]) || `SKU-${Math.random().toString(36).substr(2, 9)}`),
+            imageUrl: String(getVal(row, ["IMAGEN", "URL", "IMAGEURL", "FOTO"]) || `https://picsum.photos/seed/${prodName}/400/300`),
             createdAt: new Date().toISOString()
           };
           addDocumentNonBlocking(productsRef, newProduct);
