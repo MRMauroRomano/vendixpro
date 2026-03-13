@@ -17,7 +17,9 @@ import {
   User,
   QrCode,
   CheckCircle2,
-  ChevronRight
+  ChevronRight,
+  PlusCircle,
+  StickyNote
 } from "lucide-react";
 import { 
   Dialog, 
@@ -59,7 +61,12 @@ export default function POSPage() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
+  const [isCustomItemDialogOpen, setIsCustomItemDialogOpen] = useState(false);
   
+  // States para producto personalizado
+  const [customName, setCustomName] = useState("");
+  const [customPrice, setCustomPrice] = useState<number>(0);
+
   const [paymentMethod, setPaymentMethod] = useState<string>("");
   const [cashReceived, setCashReceived] = useState<number>(0);
   const [cardType, setCardType] = useState<"Debito" | "Credito" | "">("");
@@ -101,6 +108,26 @@ export default function POSPage() {
       }
       return [...prev, { product, quantity: 1 }];
     });
+  };
+
+  const addCustomItem = () => {
+    if (!customName || customPrice < 0) return;
+
+    const customProduct = {
+      id: `custom-${Date.now()}`,
+      name: customName,
+      price: customPrice,
+      category: "Personalizado",
+      sku: "N/A",
+      isCustom: true,
+      imageUrl: ""
+    };
+
+    addToCart(customProduct);
+    setCustomName("");
+    setCustomPrice(0);
+    setIsCustomItemDialogOpen(false);
+    toast({ title: "Producto añadido", description: `Se agregó "${customName}" al pedido.` });
   };
 
   const removeFromCart = (productId: string) => {
@@ -175,12 +202,14 @@ export default function POSPage() {
             subtotal: (item.product.price || 0) * item.quantity,
           });
 
-          // Descontar stock
-          const productDocRef = doc(firestore, "users", user.uid, "products", item.product.id);
-          const currentStock = item.product.stockQuantity || 0;
-          updateDocumentNonBlocking(productDocRef, {
-            stockQuantity: Math.max(0, currentStock - item.quantity)
-          });
+          // Descontar stock (solo si NO es producto personalizado)
+          if (!item.product.isCustom) {
+            const productDocRef = doc(firestore, "users", user.uid, "products", item.product.id);
+            const currentStock = item.product.stockQuantity || 0;
+            updateDocumentNonBlocking(productDocRef, {
+              stockQuantity: Math.max(0, currentStock - item.quantity)
+            });
+          }
         });
       }
     });
@@ -199,14 +228,55 @@ export default function POSPage() {
     <AppLayout>
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[calc(100vh-140px)] overflow-hidden">
         <div className="lg:col-span-8 flex flex-col space-y-4 overflow-hidden h-full">
-          <div className="relative shrink-0">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input 
-              placeholder="Buscar productos (nombre o SKU)..." 
-              className="pl-10 h-12 text-base shadow-sm bg-white"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+          <div className="flex gap-2 shrink-0">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input 
+                placeholder="Buscar productos (nombre o SKU)..." 
+                className="pl-10 h-12 text-base shadow-sm bg-white"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            
+            <Dialog open={isCustomItemDialogOpen} onOpenChange={setIsCustomItemDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="h-12 gap-2 border-accent text-accent hover:bg-accent/5 font-bold">
+                  <StickyNote className="h-5 w-5" />
+                  <span className="hidden sm:inline">Producto no listado</span>
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Venta de Producto Manual</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold">Descripción del Producto</label>
+                    <Input 
+                      placeholder="Ej: Recarga de servicios, Artículo sin código..." 
+                      value={customName}
+                      onChange={(e) => setCustomName(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold">Precio ($)</label>
+                    <Input 
+                      type="number" 
+                      placeholder="0.00" 
+                      className="text-xl font-bold h-12"
+                      value={customPrice || ""}
+                      onChange={(e) => setCustomPrice(Number(e.target.value))}
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button className="w-full h-11" onClick={addCustomItem} disabled={!customName || customPrice <= 0}>
+                    Añadir al Carrito
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </div>
           
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 overflow-y-auto pr-2 pb-6 flex-1 custom-scrollbar">
@@ -286,12 +356,16 @@ export default function POSPage() {
               <div className="divide-y divide-border/50">
                 {cart.map((item) => (
                   <div key={item.product.id} className="p-3 flex gap-3 items-center group hover:bg-muted/10 transition-colors">
-                    <div className="h-10 w-10 rounded border overflow-hidden bg-muted flex-shrink-0">
-                       <img 
-                        src={item.product.imageUrl || `https://picsum.photos/seed/${item.product.id}/100/100`} 
-                        alt={item.product.name}
-                        className="h-full w-full object-cover"
-                      />
+                    <div className="h-10 w-10 rounded border overflow-hidden bg-muted flex-shrink-0 flex items-center justify-center">
+                       {item.product.imageUrl ? (
+                         <img 
+                          src={item.product.imageUrl} 
+                          alt={item.product.name}
+                          className="h-full w-full object-cover"
+                        />
+                       ) : (
+                         <StickyNote className="h-5 w-5 text-muted-foreground opacity-30" />
+                       )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="font-bold text-xs truncate">{item.product.name}</div>
@@ -312,7 +386,7 @@ export default function POSPage() {
                           variant="ghost" 
                           size="icon" 
                           className="h-5 w-5 rounded hover:bg-background"
-                          onClick={() => addToCart(item.product)}
+                          onClick={() => updateQuantity(item.product.id, 1)}
                         >
                           <Plus className="h-2.5 w-2.5" />
                         </Button>
