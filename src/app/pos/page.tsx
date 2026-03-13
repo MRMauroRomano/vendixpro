@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useMemo } from "react";
@@ -164,6 +165,7 @@ export default function POSPage() {
         const saleItemsRef = collection(firestore, "users", user.uid, "sales", saleRef.id, "sale_items");
         
         cart.forEach(item => {
+          // Registrar ítem de venta
           addDocumentNonBlocking(saleItemsRef, {
             saleId: saleRef.id,
             productId: item.product.id,
@@ -173,6 +175,7 @@ export default function POSPage() {
             subtotal: (item.product.price || 0) * item.quantity,
           });
 
+          // Descontar stock
           const productDocRef = doc(firestore, "users", user.uid, "products", item.product.id);
           const currentStock = item.product.stockQuantity || 0;
           updateDocumentNonBlocking(productDocRef, {

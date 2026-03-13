@@ -4,15 +4,15 @@
 import { useState, useEffect, useMemo } from "react";
 import { AppLayout } from "@/components/layout/app-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { 
   TrendingUp, 
   TrendingDown, 
   Package, 
   AlertTriangle,
-  ArrowUpRight,
-  ArrowDownRight,
   Loader2,
-  ShoppingBag
+  Database,
+  CheckCircle2
 } from "lucide-react";
 import { 
   BarChart, 
@@ -23,13 +23,16 @@ import {
   Tooltip, 
   ResponsiveContainer
 } from "recharts";
-import { useFirestore, useUser, useMemoFirebase, useCollection } from "@/firebase";
+import { useFirestore, useUser, useMemoFirebase, useCollection, addDocumentNonBlocking } from "@/firebase";
 import { collection, query, orderBy, limit } from "firebase/firestore";
+import { useToast } from "@/hooks/use-toast";
 
 export default function DashboardPage() {
   const [mounted, setMounted] = useState(false);
   const firestore = useFirestore();
   const { user } = useUser();
+  const { toast } = useToast();
+  const [isSeeding, setIsSeeding] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -96,15 +99,55 @@ export default function DashboardPage() {
     ];
   }, [sales, expenses, products]);
 
-  // Datos para el gráfico (basados en las últimas ventas)
   const chartData = useMemo(() => {
-    // Agrupar ventas por día si es posible, o simplemente mostrar los últimos montos
     return (sales || []).slice(0, 7).reverse().map((sale, i) => ({
       name: `Venta ${i + 1}`,
       ventas: sale.totalAmount || 0,
-      gastos: 0 // Simplificado para el MVP
+      gastos: 0
     }));
   }, [sales]);
+
+  const handleSeedData = async () => {
+    if (!user || !firestore) return;
+    setIsSeeding(true);
+
+    try {
+      // Crear una categoría de ejemplo
+      const catRef = collection(firestore, "users", user.uid, "categories");
+      await addDocumentNonBlocking(catRef, { name: "Bebidas", description: "Refrescos y aguas", createdAt: new Date().toISOString() });
+
+      // Crear un producto de ejemplo
+      const prodRef = collection(firestore, "users", user.uid, "products");
+      await addDocumentNonBlocking(prodRef, {
+        name: "Producto de Prueba",
+        price: 1500,
+        stockQuantity: 10,
+        category: "Bebidas",
+        sku: "PROV-001",
+        imageUrl: "https://picsum.photos/seed/test/400/300",
+        createdAt: new Date().toISOString()
+      });
+
+      // Crear un gasto de ejemplo
+      const expRef = collection(firestore, "users", user.uid, "expenses");
+      await addDocumentNonBlocking(expRef, {
+        concept: "Insumos Iniciales",
+        category: "Limpieza",
+        amount: 500,
+        date: new Date().toISOString().split('T')[0],
+        createdAt: new Date().toISOString()
+      });
+
+      toast({
+        title: "Datos de Prueba Cargados",
+        description: "Se han creado documentos iniciales. Ahora deberías ver las colecciones en tu consola de Firebase.",
+      });
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsSeeding(false);
+    }
+  };
 
   if (!mounted || !user) {
     return (
@@ -119,9 +162,21 @@ export default function DashboardPage() {
   return (
     <AppLayout>
       <div className="space-y-8">
-        <div>
-          <h1 className="text-3xl font-bold font-headline">Dashboard de Rendimiento</h1>
-          <p className="text-muted-foreground">Visualización real de tu negocio.</p>
+        <div className="flex justify-between items-start">
+          <div>
+            <h1 className="text-3xl font-bold font-headline">Dashboard de Rendimiento</h1>
+            <p className="text-muted-foreground">Visualización real de tu negocio.</p>
+          </div>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="gap-2 border-accent text-accent hover:bg-accent/5"
+            onClick={handleSeedData}
+            disabled={isSeeding}
+          >
+            {isSeeding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Database className="h-4 w-4" />}
+            {isSeeding ? "Cargando..." : "Cargar Datos de Prueba"}
+          </Button>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -161,8 +216,9 @@ export default function DashboardPage() {
                     </BarChart>
                   </ResponsiveContainer>
                 ) : (
-                  <div className="flex items-center justify-center h-full text-muted-foreground italic">
-                    No hay ventas suficientes para mostrar el gráfico.
+                  <div className="flex flex-col items-center justify-center h-full text-muted-foreground italic gap-2">
+                    <p>No hay ventas suficientes para mostrar el gráfico.</p>
+                    <p className="text-[10px] non-italic">Realiza ventas en el POS para ver datos reales.</p>
                   </div>
                 )}
               </div>
@@ -190,8 +246,9 @@ export default function DashboardPage() {
                     </div>
                   ))}
                 {(!products || products.filter(p => (p.stockQuantity || 0) <= 5).length === 0) && (
-                  <div className="text-center py-10 opacity-30 italic text-sm">
-                    Sin alertas de stock.
+                  <div className="flex flex-col items-center py-10 opacity-30 italic text-sm text-center gap-2">
+                    <CheckCircle2 className="h-10 w-10 text-accent" />
+                    <p>Sin alertas de stock.</p>
                   </div>
                 )}
               </div>
