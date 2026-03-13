@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useMemo } from "react";
 import { AppLayout } from "@/components/layout/app-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,15 +21,108 @@ import {
   DialogTrigger,
   DialogFooter
 } from "@/components/ui/dialog";
-import { Plus, Filter, Calendar, Receipt, Download } from "lucide-react";
+import { Plus, Filter, Calendar, Download, Loader2, Receipt, Trash2 } from "lucide-react";
+import { 
+  useFirestore, 
+  useUser, 
+  useMemoFirebase, 
+  useCollection, 
+  addDocumentNonBlocking, 
+  deleteDocumentNonBlocking 
+} from "@/firebase";
+import { collection, doc, query, orderBy } from "firebase/firestore";
+import { useToast } from "@/hooks/use-toast";
+import { format, startOfMonth, isWithinInterval, endOfMonth } from "date-fns";
+import { es } from "date-fns/locale";
 
 export default function ExpensesPage() {
+  const firestore = useFirestore();
+  const { user } = useUser();
+  const { toast } = useToast();
+  const [isAddOpen, setIsAddOpen] = useState(false);
+
+  const expensesRef = useMemoFirebase(() => {
+    if (!firestore || !user?.uid) return null;
+    return query(collection(firestore, "users", user.uid, "expenses"), orderBy("date", "desc"));
+  }, [firestore, user?.uid]);
+
+  const { data: expensesData, isLoading } = useCollection(expensesRef);
+  const expenses = expensesData || [];
+
+  const stats = useMemo(() => {
+    const now = new Date();
+    const monthStart = startOfMonth(now);
+    const monthEnd = endOfMonth(now);
+
+    const monthlyExpenses = expenses.filter(exp => {
+      const expDate = new Date(exp.date);
+      return isWithinInterval(expDate, { start: monthStart, end: monthEnd });
+    });
+
+    const totalMonthly = monthlyExpenses.reduce((acc, exp) => acc + (exp.amount || 0), 0);
+    
+    // Calcular categoría con más gasto
+    const catMap: Record<string, number> = {};
+    monthlyExpenses.forEach(exp => {
+      const cat = exp.category || "General";
+      catMap[cat] = (catMap[cat] || 0) + exp.amount;
+    });
+
+    let topCategory = "-";
+    let maxVal = 0;
+    Object.entries(catMap).forEach(([cat, val]) => {
+      if (val > maxVal) {
+        maxVal = val;
+        topCategory = cat;
+      }
+    });
+
+    return {
+      totalMonthly,
+      topCategory,
+      count: monthlyExpenses.length
+    };
+  }, [expenses]);
+
+  const handleSaveExpense = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!user || !expensesRef) return;
+
+    const formData = new FormData(e.currentTarget);
+    const amount = Number(formData.get("amount"));
+    const concept = formData.get("concept") as string;
+    const category = formData.get("category") as string;
+    const date = formData.get("date") as string;
+
+    const newExpense = {
+      concept,
+      category: category || "General",
+      amount,
+      date,
+      createdAt: new Date().toISOString()
+    };
+
+    addDocumentNonBlocking(expensesRef, newExpense);
+    toast({ 
+      title: "Gasto Registrado", 
+      description: `Se guardó "${concept}" por $${amount.toLocaleString()}.` 
+    });
+    setIsAddOpen(false);
+  };
+
+  const handleDelete = (expenseId: string) => {
+    if (!user || !firestore) return;
+    const docRef = doc(firestore, "users", user.uid, "expenses", expenseId);
+    deleteDocumentNonBlocking(docRef);
+    toast({ title: "Gasto Eliminado", description: "El registro ha sido borrado de la caja." });
+  };
+
   return (
     <AppLayout>
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold font-headline">Gastos Operativos</h1>
+            <h1 className="text-3xl font-bold font-headline text-primary">Gastos Operativos</h1>
             <p className="text-muted-foreground">Registre y categorice los egresos de su negocio.</p>
           </div>
           <div className="flex gap-2">
@@ -36,7 +130,7 @@ export default function ExpensesPage() {
               <Download className="h-4 w-4" />
               CSV
             </Button>
-            <Dialog>
+            <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
               <DialogTrigger asChild>
                 <Button className="gap-2">
                   <Plus className="h-4 w-4" />
@@ -44,70 +138,72 @@ export default function ExpensesPage() {
                 </Button>
               </DialogTrigger>
               <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Nuevo Egreso de Caja</DialogTitle>
-                </DialogHeader>
-                <div className="grid gap-4 py-4">
-                  <div className="grid gap-2">
-                    <label className="text-sm font-medium">Concepto / Descripción</label>
-                    <Input placeholder="Ej: Pago de Luz" />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
+                <form onSubmit={handleSaveExpense}>
+                  <DialogHeader>
+                    <DialogTitle>Nuevo Egreso de Caja</DialogTitle>
+                  </DialogHeader>
+                  <div className="grid gap-4 py-4">
                     <div className="grid gap-2">
-                      <label className="text-sm font-medium">Categoría</label>
-                      <Input placeholder="Ej: Servicios" />
+                      <label className="text-sm font-medium">Concepto / Descripción *</label>
+                      <Input name="concept" placeholder="Ej: Pago de Luz" required />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="grid gap-2">
+                        <label className="text-sm font-medium">Categoría</label>
+                        <Input name="category" placeholder="Ej: Servicios" />
+                      </div>
+                      <div className="grid gap-2">
+                        <label className="text-sm font-medium">Monto ($) *</label>
+                        <Input name="amount" type="number" step="0.01" placeholder="0.00" required />
+                      </div>
                     </div>
                     <div className="grid gap-2">
-                      <label className="text-sm font-medium">Monto</label>
-                      <Input type="number" placeholder="0.00" />
+                      <label className="text-sm font-medium">Fecha *</label>
+                      <Input name="date" type="date" defaultValue={format(new Date(), 'yyyy-MM-dd')} required />
                     </div>
                   </div>
-                  <div className="grid gap-2">
-                    <label className="text-sm font-medium">Fecha</label>
-                    <Input type="date" />
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button type="submit">Guardar Gasto</Button>
-                </DialogFooter>
+                  <DialogFooter>
+                    <Button type="submit" className="w-full">Guardar Gasto</Button>
+                  </DialogFooter>
+                </form>
               </DialogContent>
             </Dialog>
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card>
+          <Card className="bg-primary/5 border-primary/20">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Total Gastos (Mes)</CardTitle>
+              <CardTitle className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Total Gastos (Mes)</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">$12,302.45</div>
+              <div className="text-3xl font-black text-primary">${stats.totalMonthly.toLocaleString()}</div>
             </CardContent>
           </Card>
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Categoría Mayor Gasto</CardTitle>
+              <CardTitle className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Categoría Mayor Gasto</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">Proveedores</div>
+              <div className="text-3xl font-black">{stats.topCategory}</div>
             </CardContent>
           </Card>
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Retiros de Caja</CardTitle>
+              <CardTitle className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Egresos del Mes</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">$1,500.00</div>
+              <div className="text-3xl font-black">{stats.count} registros</div>
             </CardContent>
           </Card>
         </div>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between py-4">
+        <Card className="border-2 shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between py-4 border-b">
             <div className="flex gap-2">
               <Button variant="outline" size="sm" className="gap-1">
                 <Calendar className="h-4 w-4" />
-                Mayo 2024
+                {format(new Date(), "MMMM yyyy", { locale: es })}
               </Button>
               <Button variant="outline" size="sm" className="gap-1">
                 <Filter className="h-4 w-4" />
@@ -116,38 +212,58 @@ export default function ExpensesPage() {
             </div>
           </CardHeader>
           <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Fecha</TableHead>
-                  <TableHead>Concepto</TableHead>
-                  <TableHead>Categoría</TableHead>
-                  <TableHead className="text-right">Monto</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {[
-                  { date: "15/05/2024", label: "Pago ABL", category: "Impuestos", amount: 2500 },
-                  { date: "12/05/2024", label: "Mercaderia Frutas", category: "Proveedores", amount: 15400 },
-                  { date: "10/05/2024", label: "Reparación Heladera", category: "Mantenimiento", amount: 8500 },
-                  { date: "05/05/2024", label: "Pago Alquiler", category: "Infraestructura", amount: 120000 },
-                  { date: "02/05/2024", label: "Internet Fibertel", category: "Servicios", amount: 4200 },
-                ].map((row, i) => (
-                  <TableRow key={i}>
-                    <TableCell>{row.date}</TableCell>
-                    <TableCell className="font-medium">{row.label}</TableCell>
-                    <TableCell>
-                      <span className="text-xs bg-muted px-2 py-1 rounded-full uppercase tracking-wider font-semibold">
-                        {row.category}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right font-bold text-red-500">
-                      ${row.amount.toLocaleString()}
-                    </TableCell>
+            {isLoading ? (
+              <div className="p-20 flex flex-col items-center justify-center gap-2">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <p className="text-sm text-muted-foreground">Cargando egresos...</p>
+              </div>
+            ) : expenses.length > 0 ? (
+              <Table>
+                <TableHeader className="bg-muted/30">
+                  <TableRow>
+                    <TableHead className="font-bold">Fecha</TableHead>
+                    <TableHead className="font-bold">Concepto</TableHead>
+                    <TableHead className="font-bold">Categoría</TableHead>
+                    <TableHead className="text-right font-bold">Monto</TableHead>
+                    <TableHead className="text-right font-bold">Acción</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {expenses.map((exp) => (
+                    <TableRow key={exp.id} className="hover:bg-muted/20">
+                      <TableCell className="font-medium">
+                        {format(new Date(exp.date + 'T00:00:00'), 'dd/MM/yyyy')}
+                      </TableCell>
+                      <TableCell className="font-bold">{exp.concept}</TableCell>
+                      <TableCell>
+                        <span className="text-[10px] bg-muted px-2 py-1 rounded-full uppercase tracking-wider font-black text-muted-foreground">
+                          {exp.category}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right font-black text-red-500 text-base">
+                        ${(exp.amount || 0).toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8 text-muted-foreground hover:text-red-500"
+                          onClick={() => handleDelete(exp.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-24 text-muted-foreground opacity-50">
+                <Receipt className="h-12 w-12 mb-3" />
+                <p className="font-bold">No hay gastos registrados</p>
+                <p className="text-xs text-center max-w-[200px]">Los egresos que cargues aparecerán listados aquí.</p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
