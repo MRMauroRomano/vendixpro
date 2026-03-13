@@ -18,19 +18,34 @@ import {
   DialogContent, 
   DialogHeader, 
   DialogTitle,
-  DialogDescription
+  DialogDescription,
+  DialogFooter
 } from "@/components/ui/dialog";
-import { Search, Filter, Download, FileText, Calendar, Loader2, ShoppingBag, Receipt } from "lucide-react";
-import { useFirestore, useUser, useMemoFirebase, useCollection } from "@/firebase";
-import { collection, query, orderBy, limit } from "firebase/firestore";
+import { 
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Search, Filter, Download, FileText, Calendar, Loader2, ShoppingBag, Receipt, Trash2, Eye } from "lucide-react";
+import { useFirestore, useUser, useMemoFirebase, useCollection, deleteDocumentNonBlocking } from "@/firebase";
+import { collection, query, orderBy, limit, doc } from "firebase/firestore";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { useToast } from "@/hooks/use-toast";
 
 export default function SalesHistoryPage() {
   const firestore = useFirestore();
   const { user } = useUser();
+  const { toast } = useToast();
+  
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedSale, setSelectedSale] = useState<any>(null);
+  const [saleToDelete, setSaleToDelete] = useState<string | null>(null);
 
   const salesRef = useMemoFirebase(() => {
     if (!firestore || !user?.uid) return null;
@@ -44,9 +59,23 @@ export default function SalesHistoryPage() {
   const { data: sales, isLoading } = useCollection(salesRef);
 
   const filteredSales = (sales || []).filter(sale => 
-    sale.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    sale.paymentMethod?.toLowerCase().includes(searchTerm.toLowerCase())
+    String(sale.id || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+    String(sale.paymentMethod || "").toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const handleDeleteSale = () => {
+    if (!user || !firestore || !saleToDelete) return;
+    
+    const docRef = doc(firestore, "users", user.uid, "sales", saleToDelete);
+    deleteDocumentNonBlocking(docRef);
+    
+    toast({
+      title: "Venta eliminada",
+      description: "El registro de la venta ha sido borrado correctamente.",
+    });
+    
+    setSaleToDelete(null);
+  };
 
   return (
     <AppLayout>
@@ -128,14 +157,25 @@ export default function SalesHistoryPage() {
                         ${(sale.totalAmount || 0).toLocaleString()}
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button 
-                          variant="secondary" 
-                          size="sm" 
-                          className="font-bold h-8"
-                          onClick={() => setSelectedSale(sale)}
-                        >
-                          Ver Detalle
-                        </Button>
+                        <div className="flex justify-end gap-2">
+                          <Button 
+                            variant="secondary" 
+                            size="sm" 
+                            className="font-bold h-8 gap-1"
+                            onClick={() => setSelectedSale(sale)}
+                          >
+                            <Eye className="h-3.5 w-3.5" />
+                            Ver
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8 text-muted-foreground hover:text-red-500 hover:bg-red-50"
+                            onClick={() => setSaleToDelete(sale.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -218,6 +258,25 @@ export default function SalesHistoryPage() {
             )}
           </DialogContent>
         </Dialog>
+
+        {/* Diálogo de Confirmación de Eliminación */}
+        <AlertDialog open={!!saleToDelete} onOpenChange={(open) => !open && setSaleToDelete(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>¿Está seguro de eliminar esta venta?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Esta acción es irreversible y eliminará el registro del historial. 
+                Tenga en cuenta que el stock de los productos no se verá afectado por esta eliminación.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDeleteSale} className="bg-red-500 hover:bg-red-600">
+                Eliminar Registro
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </AppLayout>
   );
