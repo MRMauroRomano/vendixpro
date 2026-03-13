@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useRef, useEffect, useMemo } from "react";
@@ -87,6 +88,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 export default function InventoryPage() {
   const firestore = useFirestore();
@@ -101,6 +104,7 @@ export default function InventoryPage() {
   const [isImporting, setIsImporting] = useState(false);
   const [isAiProcessing, setIsAiProcessing] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>("");
+  const [isVariablePrice, setIsVariablePrice] = useState(false);
   const [viewMode, setViewMode] = useState<"grid" | "list">("list");
   const [massEditData, setMassEditData] = useState<any[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -158,6 +162,7 @@ export default function InventoryPage() {
       provider: formData.get("provider") as string || "",
       sku: formData.get("sku") as string || (editingProduct ? editingProduct.sku : `SKU-${Date.now()}`),
       imageUrl,
+      isVariablePrice: isVariablePrice,
       updatedAt: new Date().toISOString()
     };
 
@@ -173,6 +178,7 @@ export default function InventoryPage() {
     }
     
     setSelectedCategory("");
+    setIsVariablePrice(false);
   };
 
   const handleMassUpdateChange = (id: string, field: string, value: any) => {
@@ -564,6 +570,8 @@ export default function InventoryPage() {
                     categories={categories} 
                     selectedCategory={selectedCategory} 
                     setSelectedCategory={setSelectedCategory} 
+                    isVariablePrice={isVariablePrice}
+                    setIsVariablePrice={setIsVariablePrice}
                   />
                   <DialogFooter>
                     <Button type="submit" className="w-full">Guardar Producto</Button>
@@ -584,6 +592,8 @@ export default function InventoryPage() {
                       categories={categories} 
                       selectedCategory={selectedCategory || editingProduct.category} 
                       setSelectedCategory={setSelectedCategory} 
+                      isVariablePrice={isVariablePrice}
+                      setIsVariablePrice={setIsVariablePrice}
                     />
                     <DialogFooter>
                       <Button type="submit" className="w-full">Actualizar Producto</Button>
@@ -682,7 +692,12 @@ export default function InventoryPage() {
                     </TableCell>
                     <TableCell className="font-medium">
                       <div className="flex flex-col">
-                        <span className="text-sm font-bold">{product.name}</span>
+                        <span className="text-sm font-bold flex items-center gap-2">
+                          {product.name}
+                          {product.isVariablePrice && (
+                            <Badge variant="secondary" className="text-[8px] h-4 px-1">VAR</Badge>
+                          )}
+                        </span>
                         <span className="text-[10px] text-muted-foreground font-mono">{product.sku}</span>
                       </div>
                     </TableCell>
@@ -692,7 +707,7 @@ export default function InventoryPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right font-black text-primary">
-                      ${(product.price || 0).toLocaleString()}
+                      {product.isVariablePrice ? "Variable" : `$${(product.price || 0).toLocaleString()}`}
                     </TableCell>
                     <TableCell className="text-right">
                       <span className={`px-2 py-1 rounded-full text-[11px] font-bold ${
@@ -712,6 +727,7 @@ export default function InventoryPage() {
                           <DropdownMenuItem className="gap-2" onClick={() => {
                             setEditingProduct(product);
                             setSelectedCategory(product.category);
+                            setIsVariablePrice(product.isVariablePrice || false);
                           }}>
                             <Edit3 className="h-4 w-4 text-blue-500" />
                             Editar
@@ -757,12 +773,15 @@ export default function InventoryPage() {
                     <span className="text-[9px] font-mono text-muted-foreground bg-muted px-1 rounded">{product.sku}</span>
                   </div>
                   <h3 className="font-bold text-sm line-clamp-2 h-10">{product.name}</h3>
-                  <div className="text-xl font-black text-primary">${(product.price || 0).toLocaleString()}</div>
+                  <div className="text-xl font-black text-primary">
+                    {product.isVariablePrice ? "Variable" : `$${(product.price || 0).toLocaleString()}`}
+                  </div>
                 </CardContent>
                 <CardFooter className="p-3 bg-muted/20 border-t flex justify-between gap-2">
                   <Button variant="outline" size="sm" className="flex-1 gap-2" onClick={() => {
                     setEditingProduct(product);
                     setSelectedCategory(product.category);
+                    setIsVariablePrice(product.isVariablePrice || false);
                   }}>
                     <Edit3 className="h-3.5 w-3.5" />
                     Editar
@@ -800,16 +819,29 @@ export default function InventoryPage() {
   );
 }
 
-function ProductFormFields({ product, categories, selectedCategory, setSelectedCategory }: any) {
+function ProductFormFields({ product, categories, selectedCategory, setSelectedCategory, isVariablePrice, setIsVariablePrice }: any) {
   return (
     <div className="grid gap-4 py-4">
       <div className="grid gap-2">
         <label className="text-sm font-medium">Nombre del Producto *</label>
-        <Input name="name" defaultValue={product?.name} placeholder="Ej: Coca Cola 1.5L" required />
+        <Input name="name" defaultValue={product?.name} placeholder="Ej: Verdura Mixta, Coca Cola 1.5L" required />
       </div>
+      
+      <div className="flex items-center space-x-2 bg-muted/30 p-3 rounded-lg border border-dashed">
+        <Switch 
+          id="variable-price" 
+          checked={isVariablePrice} 
+          onCheckedChange={setIsVariablePrice} 
+        />
+        <div className="grid gap-1.5 leading-none">
+          <Label htmlFor="variable-price" className="text-sm font-bold">Precio Variable</Label>
+          <p className="text-[10px] text-muted-foreground">Útil para verduras o pesables. El POS pedirá el precio al cobrar.</p>
+        </div>
+      </div>
+
       <div className="grid grid-cols-2 gap-4">
         <div className="grid gap-2">
-          <label className="text-sm font-medium">Precio de Venta *</label>
+          <label className="text-sm font-medium">{isVariablePrice ? "Precio Referencial" : "Precio de Venta *"}</label>
           <Input name="price" type="number" step="0.01" defaultValue={product?.price} placeholder="0.00" required />
         </div>
         <div className="grid gap-2">

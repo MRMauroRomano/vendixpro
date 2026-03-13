@@ -35,7 +35,8 @@
         "price": { "type": "number" },
         "stockQuantity": { "type": "number" },
         "categoryId": { "type": "string" },
-        "imageUrl": { "type": "string", "description": "URL of the product image" }
+        "imageUrl": { "type": "string", "description": "URL of the product image" },
+        "isVariablePrice": { "type": "boolean", "description": "If true, POS will prompt for price" }
       },
       "required": ["id", "name", "price", "stockQuantity"]
     },

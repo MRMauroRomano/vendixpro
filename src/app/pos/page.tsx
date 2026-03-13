@@ -19,7 +19,8 @@ import {
   CheckCircle2,
   ChevronRight,
   PlusCircle,
-  StickyNote
+  StickyNote,
+  Scale
 } from "lucide-react";
 import { 
   Dialog, 
@@ -63,6 +64,10 @@ export default function POSPage() {
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   const [isCustomItemDialogOpen, setIsCustomItemDialogOpen] = useState(false);
   
+  // States para producto con precio variable
+  const [variableProductDialog, setVariableProductDialog] = useState<any>(null);
+  const [tempVariablePrice, setTempVariablePrice] = useState<number>(0);
+
   // States para producto personalizado
   const [customName, setCustomName] = useState("");
   const [customPrice, setCustomPrice] = useState<number>(0);
@@ -96,18 +101,41 @@ export default function POSPage() {
     );
   }, [products, searchTerm]);
 
-  const addToCart = (product: any) => {
+  const addToCart = (product: any, overridePrice?: number) => {
+    // Si el producto es de precio variable y no se ha pasado un precio, abrir diálogo
+    if (product.isVariablePrice && overridePrice === undefined) {
+      setVariableProductDialog(product);
+      setTempVariablePrice(product.price || 0);
+      return;
+    }
+
+    const productToAdd = overridePrice !== undefined 
+      ? { ...product, price: overridePrice } 
+      : product;
+
     setCart(prev => {
-      const existing = prev.find(item => item.product.id === product.id);
+      // Los productos con precio variable se agregan como ítems únicos si el precio es distinto
+      const existing = prev.find(item => 
+        item.product.id === productToAdd.id && item.product.price === productToAdd.price
+      );
+
       if (existing) {
         return prev.map(item => 
-          item.product.id === product.id 
+          (item.product.id === productToAdd.id && item.product.price === productToAdd.price)
             ? { ...item, quantity: item.quantity + 1 }
             : item
         );
       }
-      return [...prev, { product, quantity: 1 }];
+      return [...prev, { product: productToAdd, quantity: 1 }];
     });
+  };
+
+  const handleAddVariablePriceProduct = () => {
+    if (variableProductDialog) {
+      addToCart(variableProductDialog, tempVariablePrice);
+      setVariableProductDialog(null);
+      setTempVariablePrice(0);
+    }
   };
 
   const addCustomItem = () => {
@@ -134,9 +162,9 @@ export default function POSPage() {
     setCart(prev => prev.filter(item => item.product.id !== productId));
   };
 
-  const updateQuantity = (productId: string, delta: number) => {
+  const updateQuantity = (productId: string, delta: number, price?: number) => {
     setCart(prev => prev.map(item => {
-      if (item.product.id === productId) {
+      if (item.product.id === productId && (price === undefined || item.product.price === price)) {
         const newQty = Math.max(1, item.quantity + delta);
         return { ...item, quantity: newQty };
       }
@@ -192,7 +220,6 @@ export default function POSPage() {
         const saleItemsRef = collection(firestore, "users", user.uid, "sales", saleRef.id, "sale_items");
         
         cart.forEach(item => {
-          // Registrar ítem de venta
           addDocumentNonBlocking(saleItemsRef, {
             saleId: saleRef.id,
             productId: item.product.id,
@@ -202,7 +229,6 @@ export default function POSPage() {
             subtotal: (item.product.price || 0) * item.quantity,
           });
 
-          // Descontar stock (solo si NO es producto personalizado)
           if (!item.product.isCustom) {
             const productDocRef = doc(firestore, "users", user.uid, "products", item.product.id);
             const currentStock = item.product.stockQuantity || 0;
@@ -283,7 +309,7 @@ export default function POSPage() {
             {filteredProducts.map(product => (
               <Card 
                 key={product.id} 
-                className="cursor-pointer hover:shadow-xl transition-all border-2 group overflow-hidden bg-card flex flex-col h-fit min-h-[280px]"
+                className={`cursor-pointer hover:shadow-xl transition-all border-2 group overflow-hidden bg-card flex flex-col h-fit min-h-[280px] ${product.isVariablePrice ? 'border-dashed border-accent/40' : ''}`}
                 onClick={() => addToCart(product)}
               >
                 <div className="relative aspect-video w-full overflow-hidden bg-muted border-b shrink-0">
@@ -292,10 +318,16 @@ export default function POSPage() {
                     alt={product.name}
                     className="h-full w-full object-cover transition-transform group-hover:scale-105"
                   />
-                  <div className="absolute top-2 right-2">
+                  <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">
                     <Badge className={`shadow-md font-bold ${(product.stockQuantity || 0) <= 5 ? 'bg-red-500' : 'bg-primary'}`}>
                       {product.stockQuantity || 0} u.
                     </Badge>
+                    {product.isVariablePrice && (
+                      <Badge variant="secondary" className="bg-white/90 text-accent font-black gap-1">
+                        <Scale className="h-3 w-3" />
+                        VARIABLE
+                      </Badge>
+                    )}
                   </div>
                 </div>
                 <CardContent className="p-4 space-y-2 flex-1 flex flex-col">
@@ -311,7 +343,7 @@ export default function POSPage() {
                     {product.name}
                   </h3>
                   <div className="text-xl font-black text-primary mt-auto pt-2">
-                    ${(product.price || 0).toLocaleString()}
+                    {product.isVariablePrice ? "Definir Precio" : `$${(product.price || 0).toLocaleString()}`}
                   </div>
                 </CardContent>
               </Card>
@@ -354,8 +386,8 @@ export default function POSPage() {
               </div>
             ) : (
               <div className="divide-y divide-border/50">
-                {cart.map((item) => (
-                  <div key={item.product.id} className="p-3 flex gap-3 items-center group hover:bg-muted/10 transition-colors">
+                {cart.map((item, index) => (
+                  <div key={`${item.product.id}-${index}`} className="p-3 flex gap-3 items-center group hover:bg-muted/10 transition-colors">
                     <div className="h-10 w-10 rounded border overflow-hidden bg-muted flex-shrink-0 flex items-center justify-center">
                        {item.product.imageUrl ? (
                          <img 
@@ -368,7 +400,10 @@ export default function POSPage() {
                        )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="font-bold text-xs truncate">{item.product.name}</div>
+                      <div className="font-bold text-xs truncate flex items-center gap-1">
+                        {item.product.name}
+                        {item.product.isVariablePrice && <Scale className="h-2 w-2 text-accent" />}
+                      </div>
                       <div className="text-[10px] text-muted-foreground mt-0.5">${(item.product.price || 0).toLocaleString()} c/u</div>
                     </div>
                     <div className="flex flex-col items-end gap-1">
@@ -377,7 +412,7 @@ export default function POSPage() {
                           variant="ghost" 
                           size="icon" 
                           className="h-5 w-5 rounded hover:bg-background"
-                          onClick={() => updateQuantity(item.product.id, -1)}
+                          onClick={() => updateQuantity(item.product.id, -1, item.product.price)}
                         >
                           <Minus className="h-2.5 w-2.5" />
                         </Button>
@@ -386,7 +421,7 @@ export default function POSPage() {
                           variant="ghost" 
                           size="icon" 
                           className="h-5 w-5 rounded hover:bg-background"
-                          onClick={() => updateQuantity(item.product.id, 1)}
+                          onClick={() => updateQuantity(item.product.id, 1, item.product.price)}
                         >
                           <Plus className="h-2.5 w-2.5" />
                         </Button>
@@ -534,6 +569,38 @@ export default function POSPage() {
           </CardFooter>
         </Card>
       </div>
+
+      {/* Diálogo para Precio Variable (Verduras, etc) */}
+      <Dialog open={!!variableProductDialog} onOpenChange={(open) => !open && setVariableProductDialog(null)}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Scale className="h-5 w-5 text-accent" />
+              Precio para: {variableProductDialog?.name}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-6 space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-bold">Ingresar Precio de Venta ($)</label>
+              <Input 
+                type="number" 
+                placeholder="0.00" 
+                className="h-14 text-2xl font-black text-primary border-primary"
+                autoFocus
+                value={tempVariablePrice || ""}
+                onChange={(e) => setTempVariablePrice(Number(e.target.value))}
+                onKeyDown={(e) => e.key === 'Enter' && handleAddVariablePriceProduct()}
+              />
+              <p className="text-xs text-muted-foreground italic">Este precio solo se aplicará a este ítem en el pedido actual.</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button className="w-full h-12 text-lg font-bold" onClick={handleAddVariablePriceProduct}>
+              Añadir al Carrito
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 }
