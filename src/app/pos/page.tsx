@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useMemo } from "react";
@@ -102,7 +101,6 @@ export default function POSPage() {
   }, [products, searchTerm]);
 
   const addToCart = (product: any, overridePrice?: number) => {
-    // Si el producto es de precio variable y no se ha pasado un precio, abrir diálogo
     if (product.isVariablePrice && overridePrice === undefined) {
       setVariableProductDialog(product);
       setTempVariablePrice(product.price || 0);
@@ -114,7 +112,6 @@ export default function POSPage() {
       : product;
 
     setCart(prev => {
-      // Los productos con precio variable se agregan como ítems únicos si el precio es distinto
       const existing = prev.find(item => 
         item.product.id === productToAdd.id && item.product.price === productToAdd.price
       );
@@ -155,16 +152,15 @@ export default function POSPage() {
     setCustomName("");
     setCustomPrice(0);
     setIsCustomItemDialogOpen(false);
-    toast({ title: "Producto añadido", description: `Se agregó "${customName}" al pedido.` });
   };
 
-  const removeFromCart = (productId: string) => {
-    setCart(prev => prev.filter(item => item.product.id !== productId));
+  const removeFromCart = (productId: string, price: number) => {
+    setCart(prev => prev.filter(item => !(item.product.id === productId && item.product.price === price)));
   };
 
-  const updateQuantity = (productId: string, delta: number, price?: number) => {
+  const updateQuantity = (productId: string, delta: number, price: number) => {
     setCart(prev => prev.map(item => {
-      if (item.product.id === productId && (price === undefined || item.product.price === price)) {
+      if (item.product.id === productId && item.product.price === price) {
         const newQty = Math.max(1, item.quantity + delta);
         return { ...item, quantity: newQty };
       }
@@ -172,8 +168,7 @@ export default function POSPage() {
     }));
   };
 
-  const subtotal = cart.reduce((acc, item) => acc + ((item.product.price || 0) * item.quantity), 0);
-  const total = subtotal;
+  const total = cart.reduce((acc, item) => acc + ((item.product.price || 0) * item.quantity), 0);
   const changeDue = Math.max(0, cashReceived - total);
 
   const resetPayment = () => {
@@ -184,22 +179,13 @@ export default function POSPage() {
   };
 
   const handleCompleteSale = () => {
-    if (!user || cart.length === 0 || !paymentMethod || !firestore) return;
+    if (!user?.uid || !firestore || cart.length === 0 || !paymentMethod) return;
     
     if (paymentMethod === "Efectivo" && cashReceived < total) {
       toast({
         variant: "destructive",
         title: "Dinero insuficiente",
         description: "El monto recibido es menor al total de la venta."
-      });
-      return;
-    }
-
-    if (paymentMethod === "Cuenta Corriente" && !selectedCustomerId) {
-      toast({
-        variant: "destructive",
-        title: "Falta Cliente",
-        description: "Debe seleccionar un cliente para ventas a cuenta corriente."
       });
       return;
     }
@@ -240,11 +226,7 @@ export default function POSPage() {
       }
     });
 
-    toast({
-      title: "Venta Registrada",
-      description: `Venta por $${total.toLocaleString()} completada con éxito.`,
-    });
-
+    toast({ title: "Venta Registrada", description: `Venta por $${total.toLocaleString()} completada.` });
     setCart([]);
     setIsPaymentDialogOpen(false);
     resetPayment();
@@ -280,7 +262,7 @@ export default function POSPage() {
                   <div className="space-y-2">
                     <label className="text-sm font-bold">Descripción del Producto</label>
                     <Input 
-                      placeholder="Ej: Recarga de servicios, Artículo sin código..." 
+                      placeholder="Ej: Recarga, Artículo sin código..." 
                       value={customName}
                       onChange={(e) => setCustomName(e.target.value)}
                     />
@@ -348,14 +330,6 @@ export default function POSPage() {
                 </CardContent>
               </Card>
             ))}
-            {filteredProducts.length === 0 && (
-              <div className="col-span-full py-20 text-center opacity-20 flex flex-col items-center">
-                <ShoppingBag className="h-24 w-24 mb-4" />
-                <p className="text-lg font-medium">
-                  {searchTerm ? "No se encontraron productos" : "Cargue productos en el inventario para comenzar"}
-                </p>
-              </div>
-            )}
           </div>
         </div>
 
@@ -366,13 +340,7 @@ export default function POSPage() {
                 <ShoppingBag className="h-4 w-4 text-primary" />
                 Pedido Actual
               </CardTitle>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={() => setCart([])} 
-                className="text-muted-foreground hover:bg-red-50 hover:text-red-500 text-[10px] h-7"
-                disabled={cart.length === 0}
-              >
+              <Button variant="ghost" size="sm" onClick={() => setCart([])} className="text-muted-foreground hover:text-red-500 text-[10px] h-7" disabled={cart.length === 0}>
                 Limpiar
               </Button>
             </div>
@@ -389,51 +357,25 @@ export default function POSPage() {
                 {cart.map((item, index) => (
                   <div key={`${item.product.id}-${index}`} className="p-3 flex gap-3 items-center group hover:bg-muted/10 transition-colors">
                     <div className="h-10 w-10 rounded border overflow-hidden bg-muted flex-shrink-0 flex items-center justify-center">
-                       {item.product.imageUrl ? (
-                         <img 
-                          src={item.product.imageUrl} 
-                          alt={item.product.name}
-                          className="h-full w-full object-cover"
-                        />
-                       ) : (
-                         <StickyNote className="h-5 w-5 text-muted-foreground opacity-30" />
-                       )}
+                       <img src={item.product.imageUrl || `https://picsum.photos/seed/${item.product.id}/100/100`} alt="" className="h-full w-full object-cover" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="font-bold text-xs truncate flex items-center gap-1">
-                        {item.product.name}
-                        {item.product.isVariablePrice && <Scale className="h-2 w-2 text-accent" />}
-                      </div>
-                      <div className="text-[10px] text-muted-foreground mt-0.5">${(item.product.price || 0).toLocaleString()} c/u</div>
+                      <div className="font-bold text-xs truncate">{item.product.name}</div>
+                      <div className="text-[10px] text-muted-foreground">${(item.product.price || 0).toLocaleString()} c/u</div>
                     </div>
                     <div className="flex flex-col items-end gap-1">
                       <div className="flex items-center gap-1.5 bg-muted/50 rounded p-0.5 border">
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-5 w-5 rounded hover:bg-background"
-                          onClick={() => updateQuantity(item.product.id, -1, item.product.price)}
-                        >
+                        <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => updateQuantity(item.product.id, -1, item.product.price)}>
                           <Minus className="h-2.5 w-2.5" />
                         </Button>
                         <span className="w-4 text-center text-xs font-bold">{item.quantity}</span>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-5 w-5 rounded hover:bg-background"
-                          onClick={() => updateQuantity(item.product.id, 1, item.product.price)}
-                        >
+                        <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => updateQuantity(item.product.id, 1, item.product.price)}>
                           <Plus className="h-2.5 w-2.5" />
                         </Button>
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="font-bold text-xs text-primary">${((item.product.price || 0) * item.quantity).toLocaleString()}</span>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-5 w-5 text-muted-foreground hover:text-red-500"
-                          onClick={() => removeFromCart(item.product.id)}
-                        >
+                        <Button variant="ghost" size="icon" className="h-5 w-5 hover:text-red-500" onClick={() => removeFromCart(item.product.id, item.product.price)}>
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </div>
@@ -461,7 +403,6 @@ export default function POSPage() {
                 <DialogHeader>
                   <DialogTitle className="text-xl font-bold">Total a Cobrar: ${total.toLocaleString()}</DialogTitle>
                 </DialogHeader>
-
                 <div className="space-y-5 py-3">
                   <div className="grid grid-cols-4 gap-2">
                     {[
@@ -490,7 +431,6 @@ export default function POSPage() {
                           type="number" 
                           className="text-xl font-bold h-12"
                           placeholder="0.00"
-                          autoFocus
                           value={cashReceived || ""}
                           onChange={(e) => setCashReceived(Number(e.target.value))}
                         />
@@ -504,25 +444,6 @@ export default function POSPage() {
                     </div>
                   )}
 
-                  {paymentMethod === "Tarjeta" && (
-                    <div className="grid grid-cols-2 gap-3">
-                      <Button 
-                        variant={cardType === "Debito" ? "default" : "outline"}
-                        className="h-12 font-bold"
-                        onClick={() => setCardType("Debito")}
-                      >
-                        Débito
-                      </Button>
-                      <Button 
-                        variant={cardType === "Credito" ? "default" : "outline"}
-                        className="h-12 font-bold"
-                        onClick={() => setCardType("Credito")}
-                      >
-                        Crédito
-                      </Button>
-                    </div>
-                  )}
-
                   {paymentMethod === "Cuenta Corriente" && (
                     <div className="space-y-1">
                       <label className="text-xs font-bold">Seleccionar Cliente</label>
@@ -531,36 +452,19 @@ export default function POSPage() {
                           <SelectValue placeholder="Buscar cliente..." />
                         </SelectTrigger>
                         <SelectContent>
-                          {customers.length === 0 ? (
-                            <SelectItem value="none" disabled>No hay clientes registrados</SelectItem>
-                          ) : (
-                            customers.map(customer => (
-                              <SelectItem key={customer.id} value={customer.id}>
-                                {customer.name} (Saldo: ${ (customer.currentBalance || 0).toLocaleString()})
-                              </SelectItem>
-                            ))
-                          )}
+                          {customers.map(customer => (
+                            <SelectItem key={customer.id} value={customer.id}>
+                              {customer.name} (Saldo: ${ (customer.currentBalance || 0).toLocaleString()})
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
                   )}
                 </div>
-
                 <DialogFooter className="sm:justify-between gap-3 mt-2">
-                  <Button variant="outline" onClick={() => setIsPaymentDialogOpen(false)} className="flex-1 h-11">
-                    Cancelar
-                  </Button>
-                  <Button 
-                    className="flex-1 h-11 text-base font-bold gap-2"
-                    disabled={
-                      !paymentMethod || 
-                      (paymentMethod === "Efectivo" && cashReceived < total) ||
-                      (paymentMethod === "Tarjeta" && !cardType) ||
-                      (paymentMethod === "Cuenta Corriente" && !selectedCustomerId)
-                    }
-                    onClick={handleCompleteSale}
-                  >
-                    <CheckCircle2 className="h-4 w-4" />
+                  <Button variant="outline" onClick={() => setIsPaymentDialogOpen(false)} className="flex-1 h-11">Cancelar</Button>
+                  <Button className="flex-1 h-11 text-base font-bold gap-2" disabled={!paymentMethod} onClick={handleCompleteSale}>
                     Confirmar
                   </Button>
                 </DialogFooter>
@@ -570,14 +474,10 @@ export default function POSPage() {
         </Card>
       </div>
 
-      {/* Diálogo para Precio Variable (Verduras, etc) */}
       <Dialog open={!!variableProductDialog} onOpenChange={(open) => !open && setVariableProductDialog(null)}>
         <DialogContent className="sm:max-w-[400px]">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Scale className="h-5 w-5 text-accent" />
-              Precio para: {variableProductDialog?.name}
-            </DialogTitle>
+            <DialogTitle>Precio para: {variableProductDialog?.name}</DialogTitle>
           </DialogHeader>
           <div className="py-6 space-y-4">
             <div className="space-y-2">
@@ -591,13 +491,10 @@ export default function POSPage() {
                 onChange={(e) => setTempVariablePrice(Number(e.target.value))}
                 onKeyDown={(e) => e.key === 'Enter' && handleAddVariablePriceProduct()}
               />
-              <p className="text-xs text-muted-foreground italic">Este precio solo se aplicará a este ítem en el pedido actual.</p>
             </div>
           </div>
           <DialogFooter>
-            <Button className="w-full h-12 text-lg font-bold" onClick={handleAddVariablePriceProduct}>
-              Añadir al Carrito
-            </Button>
+            <Button className="w-full h-12 text-lg font-bold" onClick={handleAddVariablePriceProduct}>Añadir al Carrito</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

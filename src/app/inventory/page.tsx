@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useRef, useEffect, useMemo } from "react";
@@ -146,7 +145,7 @@ export default function InventoryPage() {
 
   const handleSaveProduct = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!user || !productsRef || !firestore) return;
+    if (!user?.uid || !productsRef || !firestore) return;
 
     const formData = new FormData(e.currentTarget);
     const name = formData.get("name") as string;
@@ -169,11 +168,11 @@ export default function InventoryPage() {
     if (editingProduct) {
       const docRef = doc(firestore, "users", user.uid, "products", editingProduct.id);
       updateDocumentNonBlocking(docRef, productData);
-      toast({ title: "Producto Actualizado", description: `${name} se ha guardado correctamente.` });
+      toast({ title: "Producto Actualizado", description: `${name} guardado.` });
       setEditingProduct(null);
     } else {
       addDocumentNonBlocking(productsRef, { ...productData, createdAt: new Date().toISOString() });
-      toast({ title: "Producto Agregado", description: `${name} se ha guardado correctamente.` });
+      toast({ title: "Producto Agregado", description: `${name} guardado.` });
       setIsAddOpen(false);
     }
     
@@ -181,23 +180,12 @@ export default function InventoryPage() {
     setIsVariablePrice(false);
   };
 
-  const handleMassUpdateChange = (id: string, field: string, value: any) => {
-    setMassEditData(prev => prev.map(p => 
-      p.id === id ? { ...p, [field]: value } : p
-    ));
-  };
-
   const saveMassChanges = () => {
-    if (!user || !firestore) return;
+    if (!user?.uid || !firestore) return;
     
     massEditData.forEach(p => {
       const original = products.find(op => op.id === p.id);
-      if (original && (
-        original.sku !== p.sku || 
-        original.price !== Number(p.price) || 
-        original.stockQuantity !== Number(p.stockQuantity) ||
-        original.imageUrl !== p.imageUrl
-      )) {
+      if (original) {
         const docRef = doc(firestore, "users", user.uid, "products", p.id);
         updateDocumentNonBlocking(docRef, {
           sku: String(p.sku || ""),
@@ -209,182 +197,16 @@ export default function InventoryPage() {
       }
     });
 
-    toast({ title: "Cambios Guardados", description: "Se han actualizado los productos seleccionados." });
+    toast({ title: "Cambios Guardados", description: "Inventario actualizado." });
     setIsMassEditOpen(false);
     setSelectedIds(new Set());
   };
 
-  const handleExportExcel = () => {
-    if (massEditData.length === 0) {
-      toast({ variant: "destructive", title: "Error", description: "No hay datos para exportar." });
-      return;
-    }
-
-    const exportRows = massEditData.map(p => ({
-      'NOMBRE': p.name,
-      'CODIGO': p.sku,
-      'PRECIO': p.price,
-      'STOCK': p.stockQuantity,
-      'CATEGORIA': p.category,
-      'PROVEEDOR': p.provider || "",
-      'IMAGEN': p.imageUrl || ""
-    }));
-
-    const ws = XLSX.utils.json_to_sheet(exportRows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Inventario");
-    XLSX.writeFile(wb, "Inventario_VendixPro.xlsx");
-
-    toast({ title: "Descarga Exitosa", description: "El archivo Excel se ha generado correctamente." });
-  };
-
   const handleDelete = (productId: string) => {
-    if (!user || !firestore) return;
+    if (!user?.uid || !firestore) return;
     const docRef = doc(firestore, "users", user.uid, "products", productId);
     deleteDocumentNonBlocking(docRef);
-    toast({ title: "Producto Eliminado", description: "El producto ha sido removido." });
-    
-    const newSelected = new Set(selectedIds);
-    newSelected.delete(productId);
-    setSelectedIds(newSelected);
-  };
-
-  const handleBulkDelete = () => {
-    if (!user || !firestore || selectedIds.size === 0) return;
-    
-    selectedIds.forEach(id => {
-      const docRef = doc(firestore, "users", user.uid, "products", id);
-      deleteDocumentNonBlocking(docRef);
-    });
-
-    toast({ 
-      title: "Eliminación Masiva", 
-      description: `Se han eliminado ${selectedIds.size} productos.` 
-    });
-    setSelectedIds(new Set());
-    setIsConfirmDeleteOpen(false);
-  };
-
-  const toggleSelectAll = () => {
-    if (selectedIds.size === filteredProducts.length) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(filteredProducts.map(p => p.id)));
-    }
-  };
-
-  const toggleSelect = (id: string) => {
-    const newSelected = new Set(selectedIds);
-    if (newSelected.has(id)) {
-      newSelected.delete(id);
-    } else {
-      newSelected.add(id);
-    }
-    setSelectedIds(newSelected);
-  };
-
-  const handleImportClick = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handlePdfImportClick = () => {
-    pdfInputRef.current?.click();
-  };
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !user || !productsRef) return;
-
-    setIsImporting(true);
-    const reader = new FileReader();
-
-    reader.onload = async (evt) => {
-      try {
-        const bstr = evt.target?.result;
-        const wb = XLSX.read(bstr, { type: 'binary' });
-        const wsname = wb.SheetNames[0];
-        const ws = wb.Sheets[wsname];
-        const data = XLSX.utils.sheet_to_json(ws);
-
-        if (data.length === 0) {
-          toast({ variant: "destructive", title: "Archivo Vacío", description: "El Excel no contiene datos procesables." });
-          return;
-        }
-
-        const normalize = (str: string) => 
-          str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim() : "";
-
-        const getVal = (row: any, searchKeys: string[]) => {
-          const rowKeys = Object.keys(row);
-          const normalizedSearchKeys = searchKeys.map(normalize);
-
-          for (const rowKey of rowKeys) {
-            if (normalizedSearchKeys.includes(normalize(rowKey))) {
-              return row[rowKey];
-            }
-          }
-          return undefined;
-        };
-
-        data.forEach((row: any) => {
-          const prodName = String(getVal(row, ["NOMBRE", "PRODUCTO", "NAME", "ITEM", "DESCRIPCION"]) || "Producto Importado");
-          const newProduct = {
-            name: prodName,
-            price: Number(getVal(row, ["PRECIO", "PRICE", "COSTO", "COST", "MONTO", "VENTA"]) || 0),
-            stockQuantity: Number(getVal(row, ["STOCK", "CANTIDAD", "QTY", "UNIDADES"]) || 0),
-            category: String(getVal(row, ["CATEGORIA", "RUBRO", "CATEGORY", "DEPARTAMENTO"]) || "General"),
-            provider: String(getVal(row, ["PROVEEDOR", "PROVIDER", "MARCA"]) || ""),
-            sku: String(getVal(row, ["CODIGO", "SKU", "CODE", "REFERENCIA"]) || `SKU-${Math.random().toString(36).substr(2, 9)}`),
-            imageUrl: String(getVal(row, ["IMAGEN", "URL", "IMAGEURL", "FOTO"]) || `https://picsum.photos/seed/${prodName}/400/300`),
-            createdAt: new Date().toISOString()
-          };
-          addDocumentNonBlocking(productsRef, newProduct);
-        });
-
-        toast({ title: "Importación Finalizada", description: `Se procesaron ${data.length} productos exitosamente.` });
-      } catch (error) {
-        toast({ variant: "destructive", title: "Error", description: "Error al procesar el Excel. Verifique que sea un archivo .xlsx válido." });
-      } finally {
-        setIsImporting(false);
-        if (fileInputRef.current) fileInputRef.current.value = "";
-      }
-    };
-
-    reader.readAsBinaryString(file);
-  };
-
-  const handlePdfFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !user || !productsRef) return;
-
-    setIsAiProcessing(true);
-    const reader = new FileReader();
-
-    reader.onload = async (evt) => {
-      try {
-        const base64 = evt.target?.result as string;
-        const result = await importInventoryFromPdf({ pdfDataUri: base64 });
-
-        if (result && result.products) {
-          result.products.forEach((prod: any) => {
-            const newProduct = {
-              ...prod,
-              imageUrl: `https://picsum.photos/seed/${prod.name}/400/300`,
-              createdAt: new Date().toISOString()
-            };
-            addDocumentNonBlocking(productsRef, newProduct);
-          });
-          toast({ title: "IA: Importación Exitosa", description: `Se detectaron y cargaron ${result.products.length} productos.` });
-        }
-      } catch (error) {
-        toast({ variant: "destructive", title: "Error de IA", description: "No se pudo procesar el PDF." });
-      } finally {
-        setIsAiProcessing(false);
-        if (pdfInputRef.current) pdfInputRef.current.value = "";
-      }
-    };
-
-    reader.readAsDataURL(file);
+    toast({ title: "Producto Eliminado" });
   };
 
   return (
@@ -393,166 +215,13 @@ export default function InventoryPage() {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold font-headline">Inventario</h1>
-            <p className="text-muted-foreground">Gestione sus productos, precios y niveles de stock.</p>
+            <p className="text-muted-foreground">Gestione sus productos y precios.</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <input type="file" ref={fileInputRef} className="hidden" accept=".xlsx, .xls" onChange={handleFileChange} />
-            <input type="file" ref={pdfInputRef} className="hidden" accept=".pdf" onChange={handlePdfFileChange} />
-            
-            <div className="flex border rounded-md overflow-hidden bg-background mr-2 shadow-sm">
-              <Button 
-                variant={viewMode === 'list' ? 'secondary' : 'ghost'} 
-                size="icon" 
-                className="rounded-none h-10 w-10"
-                onClick={() => setViewMode('list')}
-              >
-                <List className="h-4 w-4" />
-              </Button>
-              <Button 
-                variant={viewMode === 'grid' ? 'secondary' : 'ghost'} 
-                size="icon" 
-                className="rounded-none h-10 w-10"
-                onClick={() => setViewMode('grid')}
-              >
-                <LayoutGrid className="h-4 w-4" />
-              </Button>
-            </div>
-
-            <Button variant="outline" className="gap-2" onClick={handlePdfImportClick} disabled={isAiProcessing}>
-              {isAiProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
-              Importar PDF (IA)
+            <Button variant="outline" className="gap-2" onClick={() => setIsMassEditOpen(true)}>
+              <TableProperties className="h-4 w-4" />
+              Edición Masiva
             </Button>
-
-            <div className="flex gap-1">
-              <Button variant="outline" className="gap-2" onClick={handleImportClick} disabled={isImporting}>
-                {isImporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-                Importar Excel
-              </Button>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-10 w-10 text-muted-foreground">
-                      <Info className="h-4 w-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-xs p-4">
-                    <div className="space-y-3">
-                      <p className="font-bold border-b pb-1">Encabezados aceptados:</p>
-                      <ul className="text-xs space-y-1.5 list-disc pl-4">
-                        <li><strong>Nombre:</strong> NOMBRE, Producto, Item, Descripcion...</li>
-                        <li><strong>Precio:</strong> PRECIO, Price, Venta, Costo, Monto...</li>
-                        <li><strong>Stock:</strong> STOCK, Cantidad, Qty, Unidades...</li>
-                        <li><strong>Código/SKU:</strong> CODIGO, SKU, Code, Referencia...</li>
-                        <li><strong>Categoría:</strong> CATEGORIA, Rubro, Category...</li>
-                      </ul>
-                      <p className="text-[10px] text-muted-foreground italic">El sistema reconoce mayúsculas, minúsculas y variaciones comunes sin importar acentos.</p>
-                    </div>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
-
-            <Dialog open={isMassEditOpen} onOpenChange={setIsMassEditOpen}>
-              <DialogTrigger asChild>
-                <Button variant="outline" className="gap-2 border-primary text-primary hover:bg-primary/5">
-                  <TableProperties className="h-4 w-4" />
-                  Modificación Masiva
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-6xl w-[95vw] h-[85vh] flex flex-col p-0 overflow-hidden">
-                <DialogHeader className="p-6 border-b flex flex-row items-center justify-between shrink-0">
-                  <DialogTitle className="text-2xl font-bold flex items-center gap-2">
-                    <TableProperties className="h-6 w-6" />
-                    Edición Rápida de Inventario
-                  </DialogTitle>
-                  <Button variant="outline" size="sm" className="gap-2" onClick={handleExportExcel}>
-                    <Download className="h-4 w-4" />
-                    Descargar (Excel)
-                  </Button>
-                </DialogHeader>
-                <div className="flex-1 min-h-0 relative">
-                  <ScrollArea className="h-full w-full">
-                    <div className="p-6">
-                      <Table className="min-w-[800px]">
-                        <TableHeader className="sticky top-0 bg-background z-10 shadow-sm">
-                          <TableRow>
-                            <TableHead className="w-[200px]">Producto</TableHead>
-                            <TableHead className="w-[150px]">SKU / Código</TableHead>
-                            <TableHead className="w-[120px]">Precio ($)</TableHead>
-                            <TableHead className="w-[100px]">Stock (U)</TableHead>
-                            <TableHead className="w-[300px]">Imagen (URL)</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {massEditData.map((p) => (
-                            <TableRow key={p.id}>
-                              <TableCell className="font-medium">
-                                <div className="flex flex-col">
-                                  <span className="text-sm truncate max-w-[180px]">{p.name}</span>
-                                  <span className="text-[10px] text-muted-foreground uppercase">{p.category}</span>
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                <Input 
-                                  value={p.sku || ""} 
-                                  onChange={(e) => handleMassUpdateChange(p.id, 'sku', e.target.value)}
-                                  className="h-8 text-xs font-mono"
-                                  placeholder="SKU"
-                                />
-                              </TableCell>
-                              <TableCell>
-                                <Input 
-                                  type="number" 
-                                  value={p.price || 0} 
-                                  onChange={(e) => handleMassUpdateChange(p.id, 'price', e.target.value)}
-                                  className="h-8 text-xs text-right font-bold text-primary"
-                                />
-                              </TableCell>
-                              <TableCell>
-                                <Input 
-                                  type="number" 
-                                  value={p.stockQuantity || 0} 
-                                  onChange={(e) => handleMassUpdateChange(p.id, 'stockQuantity', e.target.value)}
-                                  className={`h-8 text-xs text-right font-bold ${Number(p.stockQuantity) <= 5 ? 'text-red-500' : ''}`}
-                                />
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex items-center gap-2">
-                                  <Input 
-                                    value={p.imageUrl || ""} 
-                                    onChange={(e) => handleMassUpdateChange(p.id, 'imageUrl', e.target.value)}
-                                    className="h-8 text-[10px] font-mono flex-1 max-w-[220px]"
-                                    placeholder="https://..."
-                                  />
-                                  <div className="h-8 w-8 rounded border bg-muted flex-shrink-0 flex items-center justify-center overflow-hidden">
-                                    {p.imageUrl ? (
-                                      <img src={p.imageUrl} alt="" className="h-full w-full object-cover" />
-                                    ) : (
-                                      <ImageIcon className="h-4 w-4 text-muted-foreground opacity-30" />
-                                    )}
-                                  </div>
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                    <ScrollBar orientation="horizontal" />
-                  </ScrollArea>
-                </div>
-                <DialogFooter className="p-6 border-t bg-muted/20 gap-2 shrink-0">
-                  <Button variant="outline" onClick={() => setIsMassEditOpen(false)} className="gap-2">
-                    <X className="h-4 w-4" />
-                    Cancelar
-                  </Button>
-                  <Button onClick={saveMassChanges} className="gap-2">
-                    <Save className="h-4 w-4" />
-                    Guardar Todo
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
             
             <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
               <DialogTrigger asChild>
@@ -605,37 +274,10 @@ export default function InventoryPage() {
           </div>
         </div>
 
-        {selectedIds.size > 0 && (
-          <div className="flex items-center justify-between bg-primary/5 border-2 border-primary/20 p-4 rounded-xl animate-in slide-in-from-top duration-300">
-            <div className="flex items-center gap-3">
-              <div className="bg-primary text-white p-2 rounded-lg">
-                <CheckSquare className="h-5 w-5" />
-              </div>
-              <div>
-                <span className="font-bold text-lg">{selectedIds.size}</span>
-                <span className="text-muted-foreground ml-2">productos seleccionados</span>
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <Button variant="outline" className="gap-2" onClick={() => setIsMassEditOpen(true)}>
-                <Edit3 className="h-4 w-4" />
-                Editar Seleccionados
-              </Button>
-              <Button variant="destructive" className="gap-2" onClick={() => setIsConfirmDeleteOpen(true)}>
-                <Trash2 className="h-4 w-4" />
-                Eliminar Seleccionados
-              </Button>
-              <Button variant="ghost" size="icon" onClick={() => setSelectedIds(new Set())}>
-                <X className="h-5 w-5" />
-              </Button>
-            </div>
-          </div>
-        )}
-
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input 
-            placeholder="Buscar por nombre o código SKU..." 
+            placeholder="Buscar por nombre o SKU..." 
             className="pl-10 h-11 text-base shadow-sm" 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -643,177 +285,63 @@ export default function InventoryPage() {
         </div>
 
         {isProductsLoading ? (
-          <div className="p-24 flex flex-col items-center justify-center gap-4">
-            <Loader2 className="h-10 w-10 animate-spin text-primary" />
-            <p className="text-muted-foreground animate-pulse">Cargando inventario...</p>
-          </div>
-        ) : filteredProducts.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-24 text-muted-foreground bg-card border rounded-xl border-dashed">
-            <Package className="h-16 w-16 opacity-10 mb-4" />
-            <p className="text-xl font-semibold">No hay productos que coincidan</p>
-            <p className="text-sm">Agregue un nuevo producto o intente otra búsqueda.</p>
-          </div>
-        ) : viewMode === 'list' ? (
+          <div className="p-24 flex justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>
+        ) : (
           <div className="border rounded-xl overflow-hidden bg-card shadow-sm">
             <Table>
               <TableHeader className="bg-muted/30">
                 <TableRow>
-                  <TableHead className="w-[40px]">
-                    <Checkbox 
-                      checked={selectedIds.size === filteredProducts.length && filteredProducts.length > 0} 
-                      onCheckedChange={toggleSelectAll}
-                    />
-                  </TableHead>
                   <TableHead className="w-[80px]">Imagen</TableHead>
                   <TableHead>Producto</TableHead>
                   <TableHead>Categoría</TableHead>
                   <TableHead className="text-right">Precio</TableHead>
                   <TableHead className="text-right">Stock</TableHead>
-                  <TableHead className="text-right w-[100px]">Acciones</TableHead>
+                  <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredProducts.map((product) => (
-                  <TableRow key={product.id} className={`group hover:bg-muted/20 ${selectedIds.has(product.id) ? 'bg-primary/5' : ''}`}>
+                  <TableRow key={product.id}>
                     <TableCell>
-                      <Checkbox 
-                        checked={selectedIds.has(product.id)} 
-                        onCheckedChange={() => toggleSelect(product.id)}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <div className="relative h-12 w-12 rounded-lg overflow-hidden bg-muted border shadow-inner">
-                        <img 
-                          src={product.imageUrl || `https://picsum.photos/seed/${product.id}/100/100`} 
-                          alt={product.name}
-                          className="h-full w-full object-cover"
-                        />
+                      <div className="h-10 w-10 rounded-md overflow-hidden bg-muted">
+                        <img src={product.imageUrl || `https://picsum.photos/seed/${product.id}/100/100`} alt="" className="h-full w-full object-cover" />
                       </div>
                     </TableCell>
                     <TableCell className="font-medium">
                       <div className="flex flex-col">
-                        <span className="text-sm font-bold flex items-center gap-2">
-                          {product.name}
-                          {product.isVariablePrice && (
-                            <Badge variant="secondary" className="text-[8px] h-4 px-1">VAR</Badge>
-                          )}
-                        </span>
+                        <span>{product.name}</span>
                         <span className="text-[10px] text-muted-foreground font-mono">{product.sku}</span>
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline" className="font-normal text-[10px] uppercase">
-                        {product.category || "General"}
-                      </Badge>
+                      <Badge variant="outline" className="text-[10px] uppercase">{product.category || "General"}</Badge>
                     </TableCell>
-                    <TableCell className="text-right font-black text-primary">
-                      {product.isVariablePrice ? "Variable" : `$${(product.price || 0).toLocaleString()}`}
+                    <TableCell className="text-right font-bold">
+                      {product.isVariablePrice ? <span className="text-accent text-xs">VARIABLE</span> : `$${(product.price || 0).toLocaleString()}`}
                     </TableCell>
                     <TableCell className="text-right">
-                      <span className={`px-2 py-1 rounded-full text-[11px] font-bold ${
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                         (product.stockQuantity || 0) <= 5 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
                       }`}>
                         {product.stockQuantity || 0} u.
                       </span>
                     </TableCell>
                     <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem className="gap-2" onClick={() => {
-                            setEditingProduct(product);
-                            setSelectedCategory(product.category);
-                            setIsVariablePrice(product.isVariablePrice || false);
-                          }}>
-                            <Edit3 className="h-4 w-4 text-blue-500" />
-                            Editar
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="gap-2 text-destructive" onClick={() => handleDelete(product.id)}>
-                            <Trash2 className="h-4 w-4" />
-                            Eliminar
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                      <div className="flex justify-end gap-1">
+                        <Button variant="ghost" size="icon" onClick={() => { setEditingProduct(product); setSelectedCategory(product.category); setIsVariablePrice(!!product.isVariablePrice); }}>
+                          <Edit3 className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="text-destructive" onClick={() => handleDelete(product.id)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
-            {filteredProducts.map((product) => (
-              <Card key={product.id} className={`overflow-hidden hover:shadow-xl transition-all border-2 group ${selectedIds.has(product.id) ? 'border-primary ring-2 ring-primary/20' : ''}`}>
-                <div className="relative aspect-video w-full overflow-hidden bg-muted border-b">
-                  <div className="absolute top-2 left-2 z-10">
-                    <Checkbox 
-                      checked={selectedIds.has(product.id)} 
-                      onCheckedChange={() => toggleSelect(product.id)}
-                      className="bg-white"
-                    />
-                  </div>
-                  <img 
-                    src={product.imageUrl || `https://picsum.photos/seed/${product.id}/400/300`} 
-                    alt={product.name}
-                    className="h-full w-full object-cover transition-transform group-hover:scale-105"
-                  />
-                  <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">
-                    <Badge className={(product.stockQuantity || 0) <= 5 ? 'bg-red-500' : 'bg-primary'}>
-                      {product.stockQuantity || 0} unid.
-                    </Badge>
-                  </div>
-                </div>
-                <CardContent className="p-4 space-y-2">
-                  <div className="flex justify-between items-start">
-                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{product.category}</span>
-                    <span className="text-[9px] font-mono text-muted-foreground bg-muted px-1 rounded">{product.sku}</span>
-                  </div>
-                  <h3 className="font-bold text-sm line-clamp-2 h-10">{product.name}</h3>
-                  <div className="text-xl font-black text-primary">
-                    {product.isVariablePrice ? "Variable" : `$${(product.price || 0).toLocaleString()}`}
-                  </div>
-                </CardContent>
-                <CardFooter className="p-3 bg-muted/20 border-t flex justify-between gap-2">
-                  <Button variant="outline" size="sm" className="flex-1 gap-2" onClick={() => {
-                    setEditingProduct(product);
-                    setSelectedCategory(product.category);
-                    setIsVariablePrice(product.isVariablePrice || false);
-                  }}>
-                    <Edit3 className="h-3.5 w-3.5" />
-                    Editar
-                  </Button>
-                  <Button variant="outline" size="icon" className="text-destructive h-9 w-9" onClick={() => handleDelete(product.id)}>
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                </CardFooter>
-              </Card>
-            ))}
-          </div>
         )}
-
-        <AlertDialog open={isConfirmDeleteOpen} onOpenChange={setIsConfirmDeleteOpen}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <div className="flex items-center gap-3 text-destructive mb-2">
-                <AlertCircle className="h-6 w-6" />
-                <AlertDialogTitle>¿Confirmar eliminación masiva?</AlertDialogTitle>
-              </div>
-              <AlertDialogDescription>
-                Estás a punto de eliminar <span className="font-bold">{selectedIds.size}</span> productos de forma permanente. Esta acción no se puede deshacer.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-              <AlertDialogAction onClick={handleBulkDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                Sí, eliminar todo
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
       </div>
     </AppLayout>
   );
@@ -823,59 +351,35 @@ function ProductFormFields({ product, categories, selectedCategory, setSelectedC
   return (
     <div className="grid gap-4 py-4">
       <div className="grid gap-2">
-        <label className="text-sm font-medium">Nombre del Producto *</label>
-        <Input name="name" defaultValue={product?.name} placeholder="Ej: Verdura Mixta, Coca Cola 1.5L" required />
+        <label className="text-sm font-medium">Nombre *</label>
+        <Input name="name" defaultValue={product?.name} required />
       </div>
-      
       <div className="flex items-center space-x-2 bg-muted/30 p-3 rounded-lg border border-dashed">
-        <Switch 
-          id="variable-price" 
-          checked={isVariablePrice} 
-          onCheckedChange={setIsVariablePrice} 
-        />
-        <div className="grid gap-1.5 leading-none">
-          <Label htmlFor="variable-price" className="text-sm font-bold">Precio Variable</Label>
-          <p className="text-[10px] text-muted-foreground">Útil para verduras o pesables. El POS pedirá el precio al cobrar.</p>
-        </div>
+        <Switch id="variable-price" checked={isVariablePrice} onCheckedChange={setIsVariablePrice} />
+        <Label htmlFor="variable-price" className="text-sm font-bold">Precio Variable (Verdura/Peso)</Label>
       </div>
-
       <div className="grid grid-cols-2 gap-4">
         <div className="grid gap-2">
-          <label className="text-sm font-medium">{isVariablePrice ? "Precio Referencial" : "Precio de Venta *"}</label>
-          <Input name="price" type="number" step="0.01" defaultValue={product?.price} placeholder="0.00" required />
+          <label className="text-sm font-medium">{isVariablePrice ? "Precio Ref." : "Precio Venta *"}</label>
+          <Input name="price" type="number" step="0.01" defaultValue={product?.price} required />
         </div>
         <div className="grid gap-2">
-          <label className="text-sm font-medium">Stock Inicial *</label>
-          <Input name="stock" type="number" defaultValue={product?.stockQuantity} placeholder="0" required />
+          <label className="text-sm font-medium">Stock *</label>
+          <Input name="stock" type="number" defaultValue={product?.stockQuantity} required />
         </div>
       </div>
       <div className="grid gap-2">
         <label className="text-sm font-medium">Categoría</label>
         <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-          <SelectTrigger>
-            <SelectValue placeholder="Seleccione una categoría" />
-          </SelectTrigger>
+          <SelectTrigger><SelectValue /></SelectTrigger>
           <SelectContent>
-            {categories.length > 0 ? (
-              categories.map((cat: any) => (
-                <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
-              ))
-            ) : (
-              <SelectItem value="none" disabled>No hay categorías creadas</SelectItem>
-            )}
+            {categories.map((cat: any) => <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>
       <div className="grid gap-2">
-        <label className="text-sm font-medium">URL de Imagen (Opcional)</label>
-        <Input name="imageUrl" defaultValue={product?.imageUrl} placeholder="https://ejemplo.com/imagen.jpg" />
-      </div>
-      <div className="grid gap-2">
-        <label className="text-sm font-medium">Proveedor / SKU (Opcional)</label>
-        <div className="grid grid-cols-2 gap-2">
-          <Input name="provider" defaultValue={product?.provider} placeholder="Proveedor" />
-          <Input name="sku" defaultValue={product?.sku} placeholder="SKU / Código" />
-        </div>
+        <label className="text-sm font-medium">SKU / Código</label>
+        <Input name="sku" defaultValue={product?.sku} />
       </div>
     </div>
   );
