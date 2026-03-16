@@ -140,9 +140,9 @@ export default function BulkEditPage() {
                   <TableRow>
                     <TableHead className="w-[80px]">Imagen</TableHead>
                     <TableHead className="min-w-[200px]">Producto / SKU</TableHead>
-                    <TableHead className="w-[150px]">Precio ($)</TableHead>
-                    <TableHead className="w-[120px]">Stock (u.)</TableHead>
-                    <TableHead className="min-w-[250px]">URL Imagen</TableHead>
+                    <TableHead className="w-[180px]">Precio ($)</TableHead>
+                    <TableHead className="w-[150px]">Stock (u.)</TableHead>
+                    <TableHead className="min-w-[350px]">URL Imagen</TableHead>
                     <TableHead className="text-right">Acción</TableHead>
                   </TableRow>
                 </TableHeader>
