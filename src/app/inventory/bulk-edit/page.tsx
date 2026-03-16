@@ -19,7 +19,6 @@ import {
   Loader2, 
   Package,
   ImageIcon,
-  Tags,
   DollarSign,
   CheckCircle2
 } from "lucide-react";
@@ -87,7 +86,6 @@ export default function BulkEditPage() {
       updatedAt: new Date().toISOString()
     };
 
-    // Convertir a números si corresponde
     if (updates.price !== undefined) updates.price = Number(updates.price);
     if (updates.stockQuantity !== undefined) updates.stockQuantity = Number(updates.stockQuantity);
 
@@ -95,7 +93,6 @@ export default function BulkEditPage() {
     
     setTimeout(() => {
       setIsUpdatingId(null);
-      // Limpiar cambios locales para este producto
       const newLocalChanges = { ...localChanges };
       delete newLocalChanges[product.id];
       setLocalChanges(newLocalChanges);
@@ -166,7 +163,7 @@ export default function BulkEditPage() {
                         <TableCell>
                           <div className="h-10 w-10 rounded-md border bg-muted overflow-hidden">
                             <img 
-                              src={changes.imageUrl || p.imageUrl || `https://picsum.photos/seed/${p.id}/100/100`} 
+                              src={changes.imageUrl ?? p.imageUrl ?? `https://picsum.photos/seed/${p.id}/100/100`} 
                               alt="" 
                               className="h-full w-full object-cover" 
                             />
@@ -185,8 +182,7 @@ export default function BulkEditPage() {
                             <Input 
                               type="number"
                               className={`pl-6 h-9 font-bold ${isDirty && changes.price !== undefined ? 'border-accent ring-1 ring-accent' : ''}`}
-                              defaultValue={p.price}
-                              value={changes.price !== undefined ? changes.price : undefined}
+                              value={changes.price ?? p.price ?? ""}
                               onChange={(e) => handleLocalChange(p.id, 'price', e.target.value)}
                             />
                           </div>
@@ -195,8 +191,7 @@ export default function BulkEditPage() {
                           <Input 
                             type="number"
                             className={`h-9 font-bold text-center ${isDirty && changes.stockQuantity !== undefined ? 'border-accent ring-1 ring-accent' : ''}`}
-                            defaultValue={p.stockQuantity}
-                            value={changes.stockQuantity !== undefined ? changes.stockQuantity : undefined}
+                            value={changes.stockQuantity ?? p.stockQuantity ?? ""}
                             onChange={(e) => handleLocalChange(p.id, 'stockQuantity', e.target.value)}
                           />
                         </TableCell>
@@ -206,8 +201,7 @@ export default function BulkEditPage() {
                             <Input 
                               className={`pl-7 h-9 text-xs font-mono truncate ${isDirty && changes.imageUrl !== undefined ? 'border-accent ring-1 ring-accent' : ''}`}
                               placeholder="https://..."
-                              defaultValue={p.imageUrl}
-                              value={changes.imageUrl !== undefined ? changes.imageUrl : undefined}
+                              value={changes.imageUrl ?? p.imageUrl ?? ""}
                               onChange={(e) => handleLocalChange(p.id, 'imageUrl', e.target.value)}
                             />
                           </div>
