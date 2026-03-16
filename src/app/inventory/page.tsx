@@ -134,7 +134,10 @@ export default function InventoryPage() {
       toast({ title: "Producto Actualizado", description: `${name} guardado.` });
       setEditingProduct(null);
     } else {
-      addDocumentNonBlocking(productsRef, { ...productData, createdAt: new Date().toISOString() });
+      addDocumentNonBlocking(productsRef, { 
+        ...productData, 
+        createdAt: new Date().toISOString() 
+      });
       toast({ title: "Producto Agregado", description: `${name} guardado.` });
       setIsAddOpen(false);
     }
@@ -176,9 +179,13 @@ export default function InventoryPage() {
     reader.onload = async (evt) => {
       try {
         const bstr = evt.target?.result;
+        if (!bstr) throw new Error("File is empty");
+        
         const wb = XLSX.read(bstr, { type: "binary" });
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
+        if (!ws) throw new Error("Sheet not found");
+
         const data = XLSX.utils.sheet_to_json(ws) as any[];
 
         let importedCount = 0;

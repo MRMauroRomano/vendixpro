@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -34,7 +35,7 @@ import {
 import { Search, Filter, Download, FileText, Calendar, Loader2, ShoppingBag, Receipt, Trash2, Eye } from "lucide-react";
 import { useFirestore, useUser, useMemoFirebase, useCollection, deleteDocumentNonBlocking } from "@/firebase";
 import { collection, query, orderBy, limit, doc } from "firebase/firestore";
-import { format } from "date-fns";
+import { format, isValid } from "date-fns";
 import { es } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 
@@ -75,6 +76,13 @@ export default function SalesHistoryPage() {
     });
     
     setSaleToDelete(null);
+  };
+
+  const formatDateSafely = (dateString: string | undefined) => {
+    if (!dateString) return '-';
+    const date = new Date(dateString);
+    if (!isValid(date)) return '-';
+    return format(date, "dd/MM/yyyy HH:mm", { locale: es });
   };
 
   return (
@@ -142,7 +150,7 @@ export default function SalesHistoryPage() {
                         #{sale.id.substring(0, 8)}
                       </TableCell>
                       <TableCell className="text-sm font-medium">
-                        {sale.createdAt ? format(new Date(sale.createdAt), "dd/MM/yyyy HH:mm", { locale: es }) : '-'}
+                        {formatDateSafely(sale.createdAt)}
                       </TableCell>
                       <TableCell>
                         <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${

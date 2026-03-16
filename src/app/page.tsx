@@ -107,43 +107,42 @@ export default function DashboardPage() {
     }));
   }, [sales]);
 
-  const handleSeedData = async () => {
+  const handleSeedData = () => {
     if (!user || !firestore) return;
     setIsSeeding(true);
 
-    try {
-      const catRef = collection(firestore, "users", user.uid, "categories");
-      await addDocumentNonBlocking(catRef, { name: "Bebidas", description: "Refrescos y aguas", createdAt: new Date().toISOString() });
+    const catRef = collection(firestore, "users", user.uid, "categories");
+    addDocumentNonBlocking(catRef, { 
+      name: "Bebidas", 
+      description: "Refrescos y aguas", 
+      createdAt: new Date().toISOString() 
+    });
 
-      const prodRef = collection(firestore, "users", user.uid, "products");
-      await addDocumentNonBlocking(prodRef, {
-        name: "Producto de Prueba",
-        price: 1500,
-        stockQuantity: 10,
-        category: "Bebidas",
-        sku: "PROV-001",
-        imageUrl: "https://picsum.photos/seed/test/400/300",
-        createdAt: new Date().toISOString()
-      });
+    const prodRef = collection(firestore, "users", user.uid, "products");
+    addDocumentNonBlocking(prodRef, {
+      name: "Producto de Prueba",
+      price: 1500,
+      stockQuantity: 10,
+      category: "Bebidas",
+      sku: "PROV-001",
+      imageUrl: "https://picsum.photos/seed/test/400/300",
+      createdAt: new Date().toISOString()
+    });
 
-      const expRef = collection(firestore, "users", user.uid, "expenses");
-      await addDocumentNonBlocking(expRef, {
-        concept: "Insumos Iniciales",
-        category: "Limpieza",
-        amount: 500,
-        date: new Date().toISOString().split('T')[0],
-        createdAt: new Date().toISOString()
-      });
+    const expRef = collection(firestore, "users", user.uid, "expenses");
+    addDocumentNonBlocking(expRef, {
+      concept: "Insumos Iniciales",
+      category: "Limpieza",
+      amount: 500,
+      date: new Date().toISOString().split('T')[0],
+      createdAt: new Date().toISOString()
+    });
 
-      toast({
-        title: "Datos de Prueba Cargados",
-        description: "Se han creado documentos iniciales. Ahora deberías ver las colecciones en tu consola de Firebase.",
-      });
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setIsSeeding(false);
-    }
+    toast({
+      title: "Carga Iniciada",
+      description: "Los datos de prueba se están sincronizando con el servidor.",
+    });
+    setIsSeeding(false);
   };
 
   if (!mounted || !user) {
