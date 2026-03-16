@@ -31,22 +31,10 @@ import {
   Plus, 
   Search, 
   Trash2, 
-  Upload, 
   Loader2, 
-  LayoutGrid, 
-  List, 
   Edit3, 
-  Package,
-  MoreVertical,
   TableProperties,
-  Save,
-  X,
-  CheckSquare,
-  AlertCircle,
-  FileText,
-  Info,
-  Download,
-  Image as ImageIcon
+  ImageIcon
 } from "lucide-react";
 import { 
   useFirestore, 
@@ -59,34 +47,7 @@ import {
 } from "@/firebase";
 import { collection, doc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
-import * as XLSX from 'xlsx';
-import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { importInventoryFromPdf } from "@/ai/flows/import-pdf-inventory-flow";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 
@@ -97,18 +58,9 @@ export default function InventoryPage() {
   
   const [searchTerm, setSearchTerm] = useState("");
   const [isAddOpen, setIsAddOpen] = useState(false);
-  const [isMassEditOpen, setIsMassEditOpen] = useState(false);
-  const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any>(null);
-  const [isImporting, setIsImporting] = useState(false);
-  const [isAiProcessing, setIsAiProcessing] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [isVariablePrice, setIsVariablePrice] = useState(false);
-  const [viewMode, setViewMode] = useState<"grid" | "list">("list");
-  const [massEditData, setMassEditData] = useState<any[]>([]);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const pdfInputRef = useRef<HTMLInputElement>(null);
 
   const productsRef = useMemoFirebase(() => {
     if (!firestore || !user?.uid) return null;
@@ -134,15 +86,6 @@ export default function InventoryPage() {
     );
   }, [products, searchTerm]);
 
-  useEffect(() => {
-    if (isMassEditOpen) {
-      const itemsToEdit = selectedIds.size > 0 
-        ? products.filter(p => selectedIds.has(p.id))
-        : filteredProducts;
-      setMassEditData(itemsToEdit.map(p => ({ ...p })));
-    }
-  }, [isMassEditOpen, products, selectedIds, filteredProducts]);
-
   const handleSaveProduct = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!user?.uid || !productsRef || !firestore) return;
@@ -151,7 +94,8 @@ export default function InventoryPage() {
     const name = formData.get("name") as string;
     const price = Number(formData.get("price") || 0);
     const stock = Number(formData.get("stock") || 0);
-    const imageUrl = formData.get("imageUrl") as string || `https://picsum.photos/seed/${name}/400/300`;
+    const imageUrlInput = formData.get("imageUrl") as string;
+    const imageUrl = imageUrlInput || `https://picsum.photos/seed/${name}/400/300`;
 
     const productData = {
       name,
@@ -180,28 +124,6 @@ export default function InventoryPage() {
     setIsVariablePrice(false);
   };
 
-  const saveMassChanges = () => {
-    if (!user?.uid || !firestore) return;
-    
-    massEditData.forEach(p => {
-      const original = products.find(op => op.id === p.id);
-      if (original) {
-        const docRef = doc(firestore, "users", user.uid, "products", p.id);
-        updateDocumentNonBlocking(docRef, {
-          sku: String(p.sku || ""),
-          price: Number(p.price || 0),
-          stockQuantity: Number(p.stockQuantity || 0),
-          imageUrl: p.imageUrl || "",
-          updatedAt: new Date().toISOString()
-        });
-      }
-    });
-
-    toast({ title: "Cambios Guardados", description: "Inventario actualizado." });
-    setIsMassEditOpen(false);
-    setSelectedIds(new Set());
-  };
-
   const handleDelete = (productId: string) => {
     if (!user?.uid || !firestore) return;
     const docRef = doc(firestore, "users", user.uid, "products", productId);
@@ -218,11 +140,6 @@ export default function InventoryPage() {
             <p className="text-muted-foreground">Gestione sus productos y precios.</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" className="gap-2" onClick={() => setIsMassEditOpen(true)}>
-              <TableProperties className="h-4 w-4" />
-              Edición Masiva
-            </Button>
-            
             <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
               <DialogTrigger asChild>
                 <Button className="gap-2">
@@ -304,7 +221,11 @@ export default function InventoryPage() {
                   <TableRow key={product.id}>
                     <TableCell>
                       <div className="h-10 w-10 rounded-md overflow-hidden bg-muted">
-                        <img src={product.imageUrl || `https://picsum.photos/seed/${product.id}/100/100`} alt="" className="h-full w-full object-cover" />
+                        <img 
+                          src={product.imageUrl || `https://picsum.photos/seed/${product.id}/100/100`} 
+                          alt="" 
+                          className="h-full w-full object-cover" 
+                        />
                       </div>
                     </TableCell>
                     <TableCell className="font-medium">
@@ -349,37 +270,55 @@ export default function InventoryPage() {
 
 function ProductFormFields({ product, categories, selectedCategory, setSelectedCategory, isVariablePrice, setIsVariablePrice }: any) {
   return (
-    <div className="grid gap-4 py-4">
+    <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto px-1">
       <div className="grid gap-2">
-        <label className="text-sm font-medium">Nombre *</label>
-        <Input name="name" defaultValue={product?.name} required />
+        <label className="text-sm font-medium">Nombre del Producto *</label>
+        <Input name="name" defaultValue={product?.name} placeholder="Ej: Coca Cola 1.5L" required />
       </div>
+      
+      <div className="grid gap-2">
+        <label className="text-sm font-medium flex items-center gap-2">
+          <ImageIcon className="h-4 w-4" />
+          URL de la Imagen (Opcional)
+        </label>
+        <Input name="imageUrl" defaultValue={product?.imageUrl} placeholder="https://ejemplo.com/imagen.jpg" />
+        <p className="text-[10px] text-muted-foreground">Si se deja vacío, se generará una imagen automática.</p>
+      </div>
+
       <div className="flex items-center space-x-2 bg-muted/30 p-3 rounded-lg border border-dashed">
         <Switch id="variable-price" checked={isVariablePrice} onCheckedChange={setIsVariablePrice} />
         <Label htmlFor="variable-price" className="text-sm font-bold">Precio Variable (Verdura/Peso)</Label>
       </div>
+
       <div className="grid grid-cols-2 gap-4">
         <div className="grid gap-2">
           <label className="text-sm font-medium">{isVariablePrice ? "Precio Ref." : "Precio Venta *"}</label>
-          <Input name="price" type="number" step="0.01" defaultValue={product?.price} required />
+          <Input name="price" type="number" step="0.01" defaultValue={product?.price} placeholder="0.00" required />
         </div>
         <div className="grid gap-2">
-          <label className="text-sm font-medium">Stock *</label>
-          <Input name="stock" type="number" defaultValue={product?.stockQuantity} required />
+          <label className="text-sm font-medium">Stock Inicial *</label>
+          <Input name="stock" type="number" defaultValue={product?.stockQuantity} placeholder="0" required />
         </div>
       </div>
+
       <div className="grid gap-2">
         <label className="text-sm font-medium">Categoría</label>
         <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
           <SelectContent>
             {categories.map((cat: any) => <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>
+
       <div className="grid gap-2">
-        <label className="text-sm font-medium">SKU / Código</label>
-        <Input name="sku" defaultValue={product?.sku} />
+        <label className="text-sm font-medium">SKU / Código de Barras</label>
+        <Input name="sku" defaultValue={product?.sku} placeholder="Escanear o escribir..." />
+      </div>
+
+      <div className="grid gap-2">
+        <label className="text-sm font-medium">Proveedor</label>
+        <Input name="provider" defaultValue={product?.provider} placeholder="Nombre del proveedor" />
       </div>
     </div>
   );
