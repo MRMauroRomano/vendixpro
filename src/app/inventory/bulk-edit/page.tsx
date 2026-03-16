@@ -15,13 +15,13 @@ import {
 } from "@/components/ui/table";
 import { 
   Search, 
-  Percent, 
   Save, 
   Loader2, 
   Package,
   ImageIcon,
   Tags,
-  AlertCircle
+  DollarSign,
+  CheckCircle2
 } from "lucide-react";
 import { 
   useFirestore, 
@@ -33,13 +33,6 @@ import {
 import { collection, doc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
 export default function BulkEditPage() {
   const firestore = useFirestore();
@@ -47,27 +40,16 @@ export default function BulkEditPage() {
   const { toast } = useToast();
   
   const [searchTerm, setSearchTerm] = useState("");
-  const [percentageChange, setPercentageChange] = useState<number>(0);
-  const [bulkStock, setBulkStock] = useState<string>("");
-  const [bulkImageUrl, setBulkImageUrl] = useState<string>("");
-  const [bulkCategory, setBulkCategory] = useState<string>("");
-  const [isUpdating, setIsUpdating] = useState(false);
+  const [localChanges, setLocalChanges] = useState<Record<string, any>>({});
+  const [isUpdatingId, setIsUpdatingId] = useState<string | null>(null);
 
   const productsRef = useMemoFirebase(() => {
     if (!firestore || !user?.uid) return null;
     return collection(firestore, "users", user.uid, "products");
   }, [firestore, user?.uid]);
 
-  const categoriesRef = useMemoFirebase(() => {
-    if (!firestore || !user?.uid) return null;
-    return collection(firestore, "users", user.uid, "categories");
-  }, [firestore, user?.uid]);
-
   const { data: productsData, isLoading } = useCollection(productsRef);
-  const { data: categoriesData } = useCollection(categoriesRef);
-  
   const products = productsData || [];
-  const categories = categoriesData || [];
 
   const filteredProducts = useMemo(() => {
     const term = searchTerm.toLowerCase();
@@ -78,277 +60,213 @@ export default function BulkEditPage() {
     );
   }, [products, searchTerm]);
 
-  const handleApplyChanges = async () => {
-    if (!user || !firestore || filteredProducts.length === 0) return;
+  const handleLocalChange = (productId: string, field: string, value: any) => {
+    setLocalChanges(prev => ({
+      ...prev,
+      [productId]: {
+        ...(prev[productId] || {}),
+        [field]: value
+      }
+    }));
+  };
+
+  const handleUpdateProduct = (product: any) => {
+    if (!user || !firestore) return;
     
-    // Validar que al menos algo haya cambiado
-    if (percentageChange === 0 && bulkStock === "" && bulkImageUrl === "" && bulkCategory === "") {
-      toast({
-        variant: "destructive",
-        title: "Sin cambios",
-        description: "Debe completar al menos un campo para aplicar modificaciones.",
-      });
+    const changes = localChanges[product.id];
+    if (!changes) {
+      toast({ title: "Sin cambios", description: "No has modificado este producto." });
       return;
     }
 
-    setIsUpdating(true);
-    let updatedCount = 0;
+    setIsUpdatingId(product.id);
+    const docRef = doc(firestore, "users", user.uid, "products", product.id);
+    
+    const updates: any = {
+      ...changes,
+      updatedAt: new Date().toISOString()
+    };
 
-    try {
-      const multiplier = 1 + (percentageChange / 100);
+    // Convertir a números si corresponde
+    if (updates.price !== undefined) updates.price = Number(updates.price);
+    if (updates.stockQuantity !== undefined) updates.stockQuantity = Number(updates.stockQuantity);
+
+    updateDocumentNonBlocking(docRef, updates);
+    
+    setTimeout(() => {
+      setIsUpdatingId(null);
+      // Limpiar cambios locales para este producto
+      const newLocalChanges = { ...localChanges };
+      delete newLocalChanges[product.id];
+      setLocalChanges(newLocalChanges);
       
-      for (const product of filteredProducts) {
-        const docRef = doc(firestore, "users", user.uid, "products", product.id);
-        const updates: any = {
-          updatedAt: new Date().toISOString()
-        };
-
-        // Aplicar precio si hay cambio porcentual y no es variable
-        if (percentageChange !== 0 && !product.isVariablePrice) {
-          updates.price = Math.round((product.price || 0) * multiplier);
-        }
-
-        // Aplicar stock si se definió
-        if (bulkStock !== "") {
-          updates.stockQuantity = Number(bulkStock);
-        }
-
-        // Aplicar imagen si se definió
-        if (bulkImageUrl !== "") {
-          updates.imageUrl = bulkImageUrl;
-        }
-
-        // Aplicar categoría si se seleccionó
-        if (bulkCategory !== "") {
-          updates.category = bulkCategory;
-        }
-        
-        updateDocumentNonBlocking(docRef, updates);
-        updatedCount++;
-      }
-
-      toast({
-        title: "Modificación Exitosa",
-        description: `Se actualizaron ${updatedCount} productos con los nuevos valores.`,
+      toast({ 
+        title: "Producto Actualizado", 
+        description: `${product.name} ha sido guardado con éxito.` 
       });
-
-      // Limpiar campos
-      setPercentageChange(0);
-      setBulkStock("");
-      setBulkImageUrl("");
-      setBulkCategory("");
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Error en el proceso",
-        description: "Hubo un problema actualizando los productos.",
-      });
-    } finally {
-      setIsUpdating(false);
-    }
+    }, 500);
   };
 
   return (
     <AppLayout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold font-headline">Modificación Masiva Pro</h1>
-          <p className="text-muted-foreground">Actualice múltiples campos de sus productos simultáneamente.</p>
-        </div>
-
-        <Card className="border-2 border-primary/10 shadow-lg overflow-hidden">
-          <CardHeader className="bg-primary/5 border-b py-4">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Search className="h-5 w-5 text-accent" />
-              1. Filtrar productos a modificar
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-6">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-              <Input 
-                placeholder="Busque por nombre, categoría o SKU para seleccionar el lote..." 
-                className="pl-12 h-12 text-lg shadow-sm"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-            <p className="mt-3 text-xs text-muted-foreground flex items-center gap-1">
-              <AlertCircle className="h-3 w-3" />
-              Los cambios se aplicarán <strong>únicamente</strong> a los {filteredProducts.length} productos visibles en la tabla inferior.
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-2 border-accent/20 shadow-xl">
-          <CardHeader className="bg-accent/5 border-b py-4">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Save className="h-5 w-5 text-accent" />
-              2. Definir nuevos valores para el lote
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <div className="space-y-2">
-                <label className="text-xs font-black uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                  <Percent className="h-3 w-3" /> Ajuste Precio (%)
-                </label>
-                <Input 
-                  type="number" 
-                  placeholder="Ej: 10 o -5" 
-                  value={percentageChange || ""}
-                  onChange={(e) => setPercentageChange(Number(e.target.value))}
-                  className="h-11 font-bold"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-xs font-black uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                  <Package className="h-3 w-3" /> Nuevo Stock (Fijo)
-                </label>
-                <Input 
-                  type="number" 
-                  placeholder="Cantidad para todos..." 
-                  value={bulkStock}
-                  onChange={(e) => setBulkStock(e.target.value)}
-                  className="h-11 font-bold"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-xs font-black uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                  <ImageIcon className="h-3 w-3" /> Nueva URL Imagen
-                </label>
-                <Input 
-                  placeholder="https://..." 
-                  value={bulkImageUrl}
-                  onChange={(e) => setBulkImageUrl(e.target.value)}
-                  className="h-11"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-xs font-black uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                  <Tags className="h-3 w-3" /> Nueva Categoría
-                </label>
-                <Select value={bulkCategory} onValueChange={setBulkCategory}>
-                  <SelectTrigger className="h-11 font-medium">
-                    <SelectValue placeholder="Cambiar a..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map((cat: any) => (
-                      <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="mt-8 flex justify-end">
-              <Button 
-                size="lg"
-                className="px-10 h-14 text-lg font-black gap-3 shadow-lg hover:scale-105 transition-transform"
-                onClick={handleApplyChanges}
-                disabled={isUpdating || filteredProducts.length === 0}
-              >
-                {isUpdating ? <Loader2 className="h-6 w-6 animate-spin" /> : <Save className="h-6 w-6" />}
-                APLICAR CAMBIOS A {filteredProducts.length} PRODUCTOS
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        <div className="border rounded-xl overflow-hidden bg-card shadow-sm">
-          <div className="bg-muted/50 p-4 border-b flex justify-between items-center">
-            <span className="text-xs font-black text-muted-foreground uppercase tracking-widest">
-              Previsualización de Cambios
-            </span>
-            <Badge variant="outline" className="bg-white">
-              {filteredProducts.length} productos en lista
-            </Badge>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold font-headline text-primary">Editor Rápido de Inventario</h1>
+            <p className="text-muted-foreground">Modifica precios, stock e imágenes directamente en la lista.</p>
           </div>
-          <Table>
-            <TableHeader className="bg-muted/30">
-              <TableRow>
-                <TableHead>Producto / SKU</TableHead>
-                <TableHead>Categoría</TableHead>
-                <TableHead className="text-right">Precio</TableHead>
-                <TableHead className="text-right">Stock</TableHead>
-                <TableHead className="text-right">Imagen</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="h-32 text-center">
-                    <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
-                  </TableCell>
-                </TableRow>
-              ) : filteredProducts.map((p) => {
-                const simulatedPrice = percentageChange !== 0 && !p.isVariablePrice
-                  ? Math.round((p.price || 0) * (1 + percentageChange / 100))
-                  : null;
-                
-                return (
-                  <TableRow key={p.id}>
-                    <TableCell>
-                      <div className="flex flex-col">
-                        <span className="font-bold">{p.name}</span>
-                        <span className="text-[10px] text-muted-foreground font-mono">{p.sku}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-col gap-1">
-                        <Badge variant="secondary" className="text-[9px] w-fit">{p.category || "General"}</Badge>
-                        {bulkCategory && bulkCategory !== p.category && (
-                          <span className="text-[10px] font-bold text-accent">➔ {bulkCategory}</span>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex flex-col">
-                        <span className="text-sm font-medium">${(p.price || 0).toLocaleString()}</span>
-                        {simulatedPrice && (
-                          <span className="text-xs font-black text-accent">${simulatedPrice.toLocaleString()}</span>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex flex-col">
-                        <span className="text-sm font-medium">{p.stockQuantity || 0} u.</span>
-                        {bulkStock !== "" && (
-                          <span className="text-xs font-black text-accent">{bulkStock} u.</span>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end">
-                        <div className="h-8 w-8 rounded border overflow-hidden bg-muted">
-                          <img 
-                            src={bulkImageUrl || p.imageUrl || `https://picsum.photos/seed/${p.id}/50/50`} 
-                            alt="" 
-                            className={`h-full w-full object-cover ${bulkImageUrl ? 'border-2 border-accent' : ''}`} 
-                          />
-                        </div>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-              {filteredProducts.length === 0 && !isLoading && (
-                <TableRow>
-                  <TableCell colSpan={5} className="h-64 text-center">
-                    <div className="flex flex-col items-center gap-2 opacity-30">
-                      <Search className="h-12 w-12" />
-                      <p className="font-bold text-lg">No hay productos seleccionados</p>
-                      <p className="text-sm">Use la lupa de búsqueda para filtrar los productos que desea editar.</p>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+          <div className="relative w-full md:max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+            <Input 
+              placeholder="Buscar por nombre, SKU o categoría..." 
+              className="pl-12 h-12 shadow-sm border-primary/20 bg-white"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
         </div>
+
+        <Card className="border-2 shadow-xl overflow-hidden">
+          <CardHeader className="bg-muted/30 border-b py-3 flex flex-row items-center justify-between">
+            <CardTitle className="text-sm font-black uppercase tracking-widest flex items-center gap-2">
+              <Package className="h-4 w-4 text-accent" />
+              Lista de Productos ({filteredProducts.length})
+            </CardTitle>
+            <Badge variant="outline" className="bg-white font-bold text-primary">
+              Cambios pendientes: {Object.keys(localChanges).length}
+            </Badge>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader className="bg-muted/50">
+                  <TableRow>
+                    <TableHead className="w-[80px]">Imagen</TableHead>
+                    <TableHead className="min-w-[200px]">Producto / SKU</TableHead>
+                    <TableHead className="w-[150px]">Precio ($)</TableHead>
+                    <TableHead className="w-[120px]">Stock (u.)</TableHead>
+                    <TableHead className="min-w-[250px]">URL Imagen</TableHead>
+                    <TableHead className="text-right">Acción</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {isLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="h-64 text-center">
+                        <Loader2 className="h-10 w-10 animate-spin mx-auto text-primary" />
+                        <p className="mt-2 text-muted-foreground">Cargando productos...</p>
+                      </TableCell>
+                    </TableRow>
+                  ) : filteredProducts.map((p) => {
+                    const changes = localChanges[p.id] || {};
+                    const isDirty = Object.keys(changes).length > 0;
+                    
+                    return (
+                      <TableRow key={p.id} className={isDirty ? "bg-accent/5" : ""}>
+                        <TableCell>
+                          <div className="h-10 w-10 rounded-md border bg-muted overflow-hidden">
+                            <img 
+                              src={changes.imageUrl || p.imageUrl || `https://picsum.photos/seed/${p.id}/100/100`} 
+                              alt="" 
+                              className="h-full w-full object-cover" 
+                            />
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col">
+                            <span className="font-bold text-sm leading-tight">{p.name}</span>
+                            <span className="text-[10px] font-mono text-muted-foreground">{p.sku || 'SIN SKU'}</span>
+                            <Badge variant="secondary" className="w-fit text-[8px] mt-1 h-4 px-1">{p.category || 'General'}</Badge>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="relative">
+                            <DollarSign className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+                            <Input 
+                              type="number"
+                              className={`pl-6 h-9 font-bold ${isDirty && changes.price !== undefined ? 'border-accent ring-1 ring-accent' : ''}`}
+                              defaultValue={p.price}
+                              value={changes.price !== undefined ? changes.price : undefined}
+                              onChange={(e) => handleLocalChange(p.id, 'price', e.target.value)}
+                            />
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Input 
+                            type="number"
+                            className={`h-9 font-bold text-center ${isDirty && changes.stockQuantity !== undefined ? 'border-accent ring-1 ring-accent' : ''}`}
+                            defaultValue={p.stockQuantity}
+                            value={changes.stockQuantity !== undefined ? changes.stockQuantity : undefined}
+                            onChange={(e) => handleLocalChange(p.id, 'stockQuantity', e.target.value)}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <div className="relative">
+                            <ImageIcon className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+                            <Input 
+                              className={`pl-7 h-9 text-xs font-mono truncate ${isDirty && changes.imageUrl !== undefined ? 'border-accent ring-1 ring-accent' : ''}`}
+                              placeholder="https://..."
+                              defaultValue={p.imageUrl}
+                              value={changes.imageUrl !== undefined ? changes.imageUrl : undefined}
+                              onChange={(e) => handleLocalChange(p.id, 'imageUrl', e.target.value)}
+                            />
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button 
+                            size="sm"
+                            className={`gap-2 font-bold transition-all ${isDirty ? 'bg-accent text-accent-foreground hover:bg-accent/90' : 'opacity-30'}`}
+                            onClick={() => handleUpdateProduct(p)}
+                            disabled={!isDirty || isUpdatingId === p.id}
+                          >
+                            {isUpdatingId === p.id ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <Save className="h-3 w-3" />
+                            )}
+                            Guardar
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                  {filteredProducts.length === 0 && !isLoading && (
+                    <TableRow>
+                      <TableCell colSpan={6} className="h-64 text-center opacity-40">
+                        <div className="flex flex-col items-center gap-2">
+                          <Search className="h-12 w-12" />
+                          <p className="font-bold text-lg">No se encontraron productos</p>
+                          <p className="text-sm">Prueba ajustando los términos de búsqueda.</p>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+
+        {Object.keys(localChanges).length > 0 && (
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-4">
+            <Card className="bg-primary text-primary-foreground shadow-2xl border-none p-4 px-8 flex items-center gap-6 rounded-full">
+               <div className="flex items-center gap-2">
+                 <CheckCircle2 className="h-5 w-5 text-accent" />
+                 <span className="font-bold whitespace-nowrap">
+                   Tienes {Object.keys(localChanges).length} productos modificados
+                 </span>
+               </div>
+               <Button 
+                variant="secondary" 
+                size="sm" 
+                className="font-black text-xs"
+                onClick={() => setLocalChanges({})}
+               >
+                 DESCARTAR TODO
+               </Button>
+            </Card>
+          </div>
+        )}
       </div>
     </AppLayout>
   );
