@@ -154,19 +154,32 @@ export default function InventoryPage() {
 
         let importedCount = 0;
 
-        for (const row of data) {
-          // Columnas requeridas: sku, nombre del producto, precio, stock, unidad
-          const name = row["nombre del producto"] || row["Nombre"] || row["nombre"];
-          const sku = row["sku"] || row["SKU"] || `SKU-${Date.now()}-${importedCount}`;
-          const price = Number(row["precio"] || row["Precio"] || 0);
-          const stock = Number(row["stock"] || row["Stock"] || 0);
-          const unit = row["unidad"] || row["Unidad"] || "unidad";
+        for (const rawRow of data) {
+          // Normalizar las llaves de la fila (convertir todo a minúsculas y quitar espacios)
+          const row: any = {};
+          Object.keys(rawRow).forEach(key => {
+            row[key.toLowerCase().trim()] = rawRow[key];
+          });
+
+          // Extraer campos usando nombres flexibles
+          const name = row["nombre del producto"] || row["nombre"] || row["producto"] || row["product name"];
+          const sku = row["sku"] || row["codigo"] || row["code"] || `SKU-${Date.now()}-${importedCount}`;
+          
+          // Limpiar precio (quitar $ y convertir a número)
+          let priceStr = String(row["precio"] || row["price"] || "0");
+          const price = parseFloat(priceStr.replace(/[^0-9.-]+/g, ""));
+          
+          // Limpiar stock
+          let stockStr = String(row["stock"] || "0");
+          const stock = parseFloat(stockStr.replace(/[^0-9.-]+/g, "")) || 0;
+          
+          const unit = row["unidad"] || row["unit"] || "unidad";
 
           if (name) {
             addDocumentNonBlocking(productsRef, {
               name,
               sku: String(sku),
-              price,
+              price: isNaN(price) ? 0 : price,
               stockQuantity: stock,
               unit,
               category: "Importado",
@@ -184,10 +197,11 @@ export default function InventoryPage() {
           description: `Se han importado ${importedCount} productos con éxito.`,
         });
       } catch (error) {
+        console.error("Error importing excel:", error);
         toast({
           variant: "destructive",
           title: "Error al importar",
-          description: "Asegúrate de que el archivo Excel tenga las columnas: sku, nombre del producto, precio, stock, unidad",
+          description: "No se pudo procesar el archivo. Revisa que el formato sea correcto.",
         });
       } finally {
         setIsImporting(false);
