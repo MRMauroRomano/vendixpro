@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useRef, useEffect, useMemo } from "react";
@@ -33,7 +34,7 @@ import {
   Trash2, 
   Loader2, 
   Edit3, 
-  TableProperties,
+  FileUp,
   ImageIcon
 } from "lucide-react";
 import { 
@@ -50,17 +51,20 @@ import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import * as XLSX from "xlsx";
 
 export default function InventoryPage() {
   const firestore = useFirestore();
   const { user } = useUser();
   const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [searchTerm, setSearchTerm] = useState("");
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [isVariablePrice, setIsVariablePrice] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
 
   const productsRef = useMemoFirebase(() => {
     if (!firestore || !user?.uid) return null;
@@ -94,6 +98,7 @@ export default function InventoryPage() {
     const name = formData.get("name") as string;
     const price = Number(formData.get("price") || 0);
     const stock = Number(formData.get("stock") || 0);
+    const unit = formData.get("unit") as string || "unidad";
     const imageUrlInput = formData.get("imageUrl") as string;
     const imageUrl = imageUrlInput || `https://picsum.photos/seed/${name}/400/300`;
 
@@ -101,6 +106,7 @@ export default function InventoryPage() {
       name,
       price,
       stockQuantity: stock,
+      unit,
       category: selectedCategory || "Sin Categoría",
       provider: formData.get("provider") as string || "",
       sku: formData.get("sku") as string || (editingProduct ? editingProduct.sku : `SKU-${Date.now()}`),
@@ -131,18 +137,96 @@ export default function InventoryPage() {
     toast({ title: "Producto Eliminado" });
   };
 
+  const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user?.uid || !productsRef) return;
+
+    setIsImporting(true);
+    const reader = new FileReader();
+
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: "binary" });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws) as any[];
+
+        let importedCount = 0;
+
+        for (const row of data) {
+          // Columnas requeridas: sku, nombre del producto, precio, stock, unidad
+          const name = row["nombre del producto"] || row["Nombre"] || row["nombre"];
+          const sku = row["sku"] || row["SKU"] || `SKU-${Date.now()}-${importedCount}`;
+          const price = Number(row["precio"] || row["Precio"] || 0);
+          const stock = Number(row["stock"] || row["Stock"] || 0);
+          const unit = row["unidad"] || row["Unidad"] || "unidad";
+
+          if (name) {
+            addDocumentNonBlocking(productsRef, {
+              name,
+              sku: String(sku),
+              price,
+              stockQuantity: stock,
+              unit,
+              category: "Importado",
+              imageUrl: `https://picsum.photos/seed/${name}/400/300`,
+              isVariablePrice: false,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            });
+            importedCount++;
+          }
+        }
+
+        toast({
+          title: "Importación Finalizada",
+          description: `Se han importado ${importedCount} productos con éxito.`,
+        });
+      } catch (error) {
+        toast({
+          variant: "destructive",
+          title: "Error al importar",
+          description: "Asegúrate de que el archivo Excel tenga las columnas: sku, nombre del producto, precio, stock, unidad",
+        });
+      } finally {
+        setIsImporting(false);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+      }
+    };
+
+    reader.readAsBinaryString(file);
+  };
+
   return (
     <AppLayout>
       <div className="space-y-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold font-headline">Inventario</h1>
-            <p className="text-muted-foreground">Gestione sus productos y precios.</p>
+            <h1 className="text-3xl font-bold font-headline text-primary">Inventario</h1>
+            <p className="text-muted-foreground">Gestione sus productos, precios y stock.</p>
           </div>
           <div className="flex flex-wrap gap-2">
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              className="hidden" 
+              accept=".xlsx, .xls" 
+              onChange={handleImportExcel}
+            />
+            <Button 
+              variant="outline" 
+              className="gap-2 border-primary/20" 
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isImporting}
+            >
+              {isImporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileUp className="h-4 w-4" />}
+              Importar Excel
+            </Button>
+
             <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
               <DialogTrigger asChild>
-                <Button className="gap-2">
+                <Button className="gap-2 bg-accent text-accent-foreground hover:bg-accent/90">
                   <Plus className="h-4 w-4" />
                   Nuevo Producto
                 </Button>
@@ -160,7 +244,7 @@ export default function InventoryPage() {
                     setIsVariablePrice={setIsVariablePrice}
                   />
                   <DialogFooter>
-                    <Button type="submit" className="w-full">Guardar Producto</Button>
+                    <Button type="submit" className="w-full h-11">Guardar Producto</Button>
                   </DialogFooter>
                 </form>
               </DialogContent>
@@ -182,7 +266,7 @@ export default function InventoryPage() {
                       setIsVariablePrice={setIsVariablePrice}
                     />
                     <DialogFooter>
-                      <Button type="submit" className="w-full">Actualizar Producto</Button>
+                      <Button type="submit" className="w-full h-11">Actualizar Producto</Button>
                     </DialogFooter>
                   </form>
                 )}
@@ -192,10 +276,10 @@ export default function InventoryPage() {
         </div>
 
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
           <Input 
             placeholder="Buscar por nombre o SKU..." 
-            className="pl-10 h-11 text-base shadow-sm" 
+            className="pl-12 h-12 text-base shadow-sm bg-white" 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -204,7 +288,7 @@ export default function InventoryPage() {
         {isProductsLoading ? (
           <div className="p-24 flex justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>
         ) : (
-          <div className="border rounded-xl overflow-hidden bg-card shadow-sm">
+          <div className="border-2 rounded-xl overflow-hidden bg-card shadow-sm">
             <Table>
               <TableHeader className="bg-muted/30">
                 <TableRow>
@@ -220,7 +304,7 @@ export default function InventoryPage() {
                 {filteredProducts.map((product) => (
                   <TableRow key={product.id}>
                     <TableCell>
-                      <div className="h-10 w-10 rounded-md overflow-hidden bg-muted">
+                      <div className="h-10 w-10 rounded-md overflow-hidden bg-muted border">
                         <img 
                           src={product.imageUrl || `https://picsum.photos/seed/${product.id}/100/100`} 
                           alt="" 
@@ -230,35 +314,45 @@ export default function InventoryPage() {
                     </TableCell>
                     <TableCell className="font-medium">
                       <div className="flex flex-col">
-                        <span>{product.name}</span>
-                        <span className="text-[10px] text-muted-foreground font-mono">{product.sku}</span>
+                        <span className="font-bold text-sm">{product.name}</span>
+                        <div className="flex gap-2 items-center">
+                          <span className="text-[10px] text-muted-foreground font-mono">{product.sku}</span>
+                          <span className="text-[10px] bg-muted px-1.5 rounded-full font-bold">{product.unit || 'unidad'}</span>
+                        </div>
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline" className="text-[10px] uppercase">{product.category || "General"}</Badge>
+                      <Badge variant="outline" className="text-[10px] uppercase font-bold">{product.category || "General"}</Badge>
                     </TableCell>
-                    <TableCell className="text-right font-bold">
-                      {product.isVariablePrice ? <span className="text-accent text-xs">VARIABLE</span> : `$${(product.price || 0).toLocaleString()}`}
+                    <TableCell className="text-right font-black text-primary">
+                      {product.isVariablePrice ? <span className="text-accent text-[10px] font-black">VARIABLE</span> : `$${(product.price || 0).toLocaleString()}`}
                     </TableCell>
                     <TableCell className="text-right">
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
                         (product.stockQuantity || 0) <= 5 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
                       }`}>
-                        {product.stockQuantity || 0} u.
+                        {product.stockQuantity || 0} {product.unit || 'u.'}
                       </span>
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
-                        <Button variant="ghost" size="icon" onClick={() => { setEditingProduct(product); setSelectedCategory(product.category); setIsVariablePrice(!!product.isVariablePrice); }}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditingProduct(product); setSelectedCategory(product.category); setIsVariablePrice(!!product.isVariablePrice); }}>
                           <Edit3 className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="text-destructive" onClick={() => handleDelete(product.id)}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={() => handleDelete(product.id)}>
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
                     </TableCell>
                   </TableRow>
                 ))}
+                {filteredProducts.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-24 text-muted-foreground italic">
+                      No se encontraron productos en el inventario.
+                    </TableCell>
+                  </TableRow>
+                )}
               </TableBody>
             </Table>
           </div>
@@ -272,53 +366,68 @@ function ProductFormFields({ product, categories, selectedCategory, setSelectedC
   return (
     <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto px-1">
       <div className="grid gap-2">
-        <label className="text-sm font-medium">Nombre del Producto *</label>
+        <label className="text-sm font-bold">Nombre del Producto *</label>
         <Input name="name" defaultValue={product?.name} placeholder="Ej: Coca Cola 1.5L" required />
       </div>
       
       <div className="grid gap-2">
-        <label className="text-sm font-medium flex items-center gap-2">
-          <ImageIcon className="h-4 w-4" />
-          URL de la Imagen (Opcional)
+        <label className="text-sm font-bold flex items-center gap-2">
+          <ImageIcon className="h-4 w-4 text-muted-foreground" />
+          URL de la Imagen
         </label>
         <Input name="imageUrl" defaultValue={product?.imageUrl} placeholder="https://ejemplo.com/imagen.jpg" />
-        <p className="text-[10px] text-muted-foreground">Si se deja vacío, se generará una imagen automática.</p>
+        <p className="text-[10px] text-muted-foreground">Opcional. Se generará una imagen automática si se deja vacío.</p>
       </div>
 
-      <div className="flex items-center space-x-2 bg-muted/30 p-3 rounded-lg border border-dashed">
+      <div className="flex items-center space-x-2 bg-primary/5 p-4 rounded-xl border-2 border-dashed border-primary/20">
         <Switch id="variable-price" checked={isVariablePrice} onCheckedChange={setIsVariablePrice} />
-        <Label htmlFor="variable-price" className="text-sm font-bold">Precio Variable (Verdura/Peso)</Label>
+        <Label htmlFor="variable-price" className="text-sm font-black text-primary uppercase tracking-tight">Venta por Peso / Precio Variable</Label>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
         <div className="grid gap-2">
-          <label className="text-sm font-medium">{isVariablePrice ? "Precio Ref." : "Precio Venta *"}</label>
+          <label className="text-sm font-bold">{isVariablePrice ? "Precio Referencial" : "Precio Venta *"}</label>
           <Input name="price" type="number" step="0.01" defaultValue={product?.price} placeholder="0.00" required />
         </div>
         <div className="grid gap-2">
-          <label className="text-sm font-medium">Stock Inicial *</label>
+          <label className="text-sm font-bold">Stock Inicial *</label>
           <Input name="stock" type="number" defaultValue={product?.stockQuantity} placeholder="0" required />
         </div>
       </div>
 
-      <div className="grid gap-2">
-        <label className="text-sm font-medium">Categoría</label>
-        <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-          <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
-          <SelectContent>
-            {categories.map((cat: any) => <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>)}
-          </SelectContent>
-        </Select>
+      <div className="grid grid-cols-2 gap-4">
+        <div className="grid gap-2">
+          <label className="text-sm font-bold">Unidad de Medida</label>
+          <Select name="unit" defaultValue={product?.unit || "unidad"}>
+            <SelectTrigger><SelectValue placeholder="Elegir..." /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="unidad">Unidad (u.)</SelectItem>
+              <SelectItem value="kg">Kilogramos (kg)</SelectItem>
+              <SelectItem value="pack">Pack</SelectItem>
+              <SelectItem value="litro">Litros (L)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="grid gap-2">
+          <label className="text-sm font-bold">Categoría</label>
+          <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+            <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
+            <SelectContent>
+              {categories.map((cat: any) => <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
-      <div className="grid gap-2">
-        <label className="text-sm font-medium">SKU / Código de Barras</label>
-        <Input name="sku" defaultValue={product?.sku} placeholder="Escanear o escribir..." />
-      </div>
-
-      <div className="grid gap-2">
-        <label className="text-sm font-medium">Proveedor</label>
-        <Input name="provider" defaultValue={product?.provider} placeholder="Nombre del proveedor" />
+      <div className="grid grid-cols-2 gap-4">
+        <div className="grid gap-2">
+          <label className="text-sm font-bold">SKU / Código</label>
+          <Input name="sku" defaultValue={product?.sku} placeholder="Escanear..." />
+        </div>
+        <div className="grid gap-2">
+          <label className="text-sm font-bold">Proveedor</label>
+          <Input name="provider" defaultValue={product?.provider} placeholder="Nombre..." />
+        </div>
       </div>
     </div>
   );

@@ -34,6 +34,7 @@
         "sku": { "type": "string" },
         "price": { "type": "number" },
         "stockQuantity": { "type": "number" },
+        "unit": { "type": "string", "description": "Unidad de medida (ej: kg, unidad, pack)" },
         "categoryId": { "type": "string" },
         "imageUrl": { "type": "string", "description": "URL of the product image" },
         "isVariablePrice": { "type": "boolean", "description": "If true, POS will prompt for price" }
