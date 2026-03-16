@@ -60,7 +60,7 @@ export default function DashboardPage() {
   const stats = useMemo(() => {
     const totalSales = (sales || []).reduce((acc, sale) => acc + (sale.totalAmount || 0), 0);
     const totalExpenses = (expenses || []).reduce((acc, exp) => acc + (exp.amount || 0), 0);
-    const totalStock = (products || []).reduce((acc, prod) => acc + (prod.stockQuantity || 0), 0);
+    const productCount = (products || []).length;
     const lowStockCount = (products || []).filter(p => (p.stockQuantity || 0) <= 5).length;
 
     return [
@@ -81,9 +81,9 @@ export default function DashboardPage() {
         color: "text-red-500"
       },
       {
-        title: "Stock Total",
-        value: totalStock.toLocaleString(),
-        change: "Unidades en almacén",
+        title: "Productos Totales",
+        value: productCount.toLocaleString(),
+        change: "Variedad en inventario",
         trend: "neutral",
         icon: Package,
         color: "text-blue-500"
@@ -112,11 +112,9 @@ export default function DashboardPage() {
     setIsSeeding(true);
 
     try {
-      // Crear una categoría de ejemplo
       const catRef = collection(firestore, "users", user.uid, "categories");
       await addDocumentNonBlocking(catRef, { name: "Bebidas", description: "Refrescos y aguas", createdAt: new Date().toISOString() });
 
-      // Crear un producto de ejemplo
       const prodRef = collection(firestore, "users", user.uid, "products");
       await addDocumentNonBlocking(prodRef, {
         name: "Producto de Prueba",
@@ -128,7 +126,6 @@ export default function DashboardPage() {
         createdAt: new Date().toISOString()
       });
 
-      // Crear un gasto de ejemplo
       const expRef = collection(firestore, "users", user.uid, "expenses");
       await addDocumentNonBlocking(expRef, {
         concept: "Insumos Iniciales",
