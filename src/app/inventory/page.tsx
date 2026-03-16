@@ -21,6 +21,17 @@ import {
   DialogTrigger, 
   DialogFooter
 } from "@/components/ui/dialog";
+import { 
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import {
   Select,
   SelectContent,
@@ -35,7 +46,8 @@ import {
   Loader2, 
   Edit3, 
   FileUp,
-  ImageIcon
+  ImageIcon,
+  AlertTriangle
 } from "lucide-react";
 import { 
   useFirestore, 
@@ -65,6 +77,7 @@ export default function InventoryPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [isVariablePrice, setIsVariablePrice] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+  const [isDeletingAll, setIsDeletingAll] = useState(false);
 
   const productsRef = useMemoFirebase(() => {
     if (!firestore || !user?.uid) return null;
@@ -137,6 +150,22 @@ export default function InventoryPage() {
     toast({ title: "Producto Eliminado" });
   };
 
+  const handleDeleteAll = () => {
+    if (!user?.uid || !firestore || products.length === 0) return;
+    
+    setIsDeletingAll(true);
+    products.forEach(p => {
+      const docRef = doc(firestore, "users", user.uid, "products", p.id);
+      deleteDocumentNonBlocking(docRef);
+    });
+
+    toast({ 
+      title: "Limpieza Iniciada", 
+      description: `Se están eliminando ${products.length} productos.` 
+    });
+    setIsDeletingAll(false);
+  };
+
   const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user?.uid || !productsRef) return;
@@ -155,21 +184,17 @@ export default function InventoryPage() {
         let importedCount = 0;
 
         for (const rawRow of data) {
-          // Normalizar las llaves de la fila (convertir todo a minúsculas y quitar espacios)
           const row: any = {};
           Object.keys(rawRow).forEach(key => {
             row[key.toLowerCase().trim()] = rawRow[key];
           });
 
-          // Extraer campos usando nombres flexibles
           const name = row["nombre del producto"] || row["nombre"] || row["producto"] || row["product name"];
           const sku = row["sku"] || row["codigo"] || row["code"] || `SKU-${Date.now()}-${importedCount}`;
           
-          // Limpiar precio (quitar $ y convertir a número)
           let priceStr = String(row["precio"] || row["price"] || "0");
           const price = parseFloat(priceStr.replace(/[^0-9.-]+/g, ""));
           
-          // Limpiar stock
           let stockStr = String(row["stock"] || "0");
           const stock = parseFloat(stockStr.replace(/[^0-9.-]+/g, "")) || 0;
           
@@ -228,6 +253,34 @@ export default function InventoryPage() {
               accept=".xlsx, .xls" 
               onChange={handleImportExcel}
             />
+            
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline" className="gap-2 border-red-200 text-red-600 hover:bg-red-50" disabled={products.length === 0 || isDeletingAll}>
+                  <Trash2 className="h-4 w-4" />
+                  Eliminar Todo
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="flex items-center gap-2">
+                    <AlertTriangle className="h-5 w-5 text-red-500" />
+                    ¿Estás absolutamente seguro?
+                  </AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Esta acción eliminará permanentemente todos los productos de tu inventario.
+                    No podrás deshacer esta acción una vez iniciada.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleDeleteAll} className="bg-red-600 hover:bg-red-700">
+                    Sí, eliminar todo
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+
             <Button 
               variant="outline" 
               className="gap-2 border-primary/20" 
