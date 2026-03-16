@@ -15,11 +15,10 @@ import {
   ShoppingBag,
   User,
   QrCode,
-  CheckCircle2,
   ChevronRight,
-  PlusCircle,
   StickyNote,
-  Scale
+  Scale,
+  Loader2
 } from "lucide-react";
 import { 
   Dialog, 
@@ -63,17 +62,15 @@ export default function POSPage() {
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   const [isCustomItemDialogOpen, setIsCustomItemDialogOpen] = useState(false);
   
-  // States para producto con precio variable
   const [variableProductDialog, setVariableProductDialog] = useState<any>(null);
   const [tempVariablePrice, setTempVariablePrice] = useState<number>(0);
 
-  // States para producto personalizado
   const [customName, setCustomName] = useState("");
   const [customPrice, setCustomPrice] = useState<number>(0);
 
   const [paymentMethod, setPaymentMethod] = useState<string>("");
   const [cashReceived, setCashReceived] = useState<number>(0);
-  const [cardType, setCardType] = useState<"Debito" | "Credito" | "">("");
+  const [cardType, setCardType] = useState<string>("");
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
 
   const productsRef = useMemoFirebase(() => {
@@ -86,7 +83,7 @@ export default function POSPage() {
     return collection(firestore, "users", user.uid, "customers");
   }, [firestore, user?.uid]);
   
-  const { data: productsData } = useCollection(productsRef);
+  const { data: productsData, isLoading: isProductsLoading } = useCollection(productsRef);
   const { data: customersData } = useCollection(customersRef);
 
   const products = productsData || [];
@@ -287,8 +284,12 @@ export default function POSPage() {
             </Dialog>
           </div>
           
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 overflow-y-auto pr-2 pb-6 flex-1 custom-scrollbar">
-            {filteredProducts.map(product => (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 overflow-y-auto pr-2 pb-6 flex-1">
+            {isProductsLoading ? (
+              <div className="col-span-full flex justify-center py-20">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
+            ) : filteredProducts.map(product => (
               <Card 
                 key={product.id} 
                 className={`cursor-pointer hover:shadow-xl transition-all border-2 group overflow-hidden bg-card flex flex-col h-fit min-h-[280px] ${product.isVariablePrice ? 'border-dashed border-accent/40' : ''}`}
