@@ -17,7 +17,8 @@ import {
   ChevronRight,
   AlertTriangle,
   Tags,
-  Layers
+  Layers,
+  TableProperties
 } from "lucide-react";
 import {
   Sidebar,
@@ -50,6 +51,7 @@ const navItems = [
     href: "/inventory",
     items: [
       { label: "Todos los Productos", href: "/inventory", icon: Layers },
+      { label: "Modificación Masiva", href: "/inventory/bulk-edit", icon: TableProperties },
       { label: "Stock Bajo", href: "/inventory/low-stock", icon: AlertTriangle },
       { label: "Categorías", href: "/inventory/categories", icon: Tags },
     ]
