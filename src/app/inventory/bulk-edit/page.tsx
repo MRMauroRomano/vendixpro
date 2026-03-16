@@ -20,7 +20,8 @@ import {
   Package,
   ImageIcon,
   DollarSign,
-  CheckCircle2
+  CheckCircle2,
+  AlertCircle
 } from "lucide-react";
 import { 
   useFirestore, 
@@ -41,6 +42,7 @@ export default function BulkEditPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [localChanges, setLocalChanges] = useState<Record<string, any>>({});
   const [isUpdatingId, setIsUpdatingId] = useState<string | null>(null);
+  const [isSavingAll, setIsSavingAll] = useState(false);
 
   const productsRef = useMemoFirebase(() => {
     if (!firestore || !user?.uid) return null;
@@ -73,10 +75,7 @@ export default function BulkEditPage() {
     if (!user || !firestore) return;
     
     const changes = localChanges[product.id];
-    if (!changes) {
-      toast({ title: "Sin cambios", description: "No has modificado este producto." });
-      return;
-    }
+    if (!changes) return;
 
     setIsUpdatingId(product.id);
     const docRef = doc(firestore, "users", user.uid, "products", product.id);
@@ -86,22 +85,53 @@ export default function BulkEditPage() {
       updatedAt: new Date().toISOString()
     };
 
-    if (updates.price !== undefined) updates.price = Number(updates.price);
-    if (updates.stockQuantity !== undefined) updates.stockQuantity = Number(updates.stockQuantity);
+    if (updates.price !== undefined) updates.price = Number(updates.price) || 0;
+    if (updates.stockQuantity !== undefined) updates.stockQuantity = Number(updates.stockQuantity) || 0;
 
     updateDocumentNonBlocking(docRef, updates);
     
     setTimeout(() => {
       setIsUpdatingId(null);
-      const newLocalChanges = { ...localChanges };
-      delete newLocalChanges[product.id];
-      setLocalChanges(newLocalChanges);
+      setLocalChanges(prev => {
+        const next = { ...prev };
+        delete next[product.id];
+        return next;
+      });
       
       toast({ 
         title: "Producto Actualizado", 
-        description: `${product.name} ha sido guardado con éxito.` 
+        description: `${product.name} ha sido guardado.` 
       });
-    }, 500);
+    }, 400);
+  };
+
+  const handleSaveAll = async () => {
+    if (!user || !firestore || Object.keys(localChanges).length === 0) return;
+
+    setIsSavingAll(true);
+    const totalChanges = Object.keys(localChanges).length;
+
+    Object.entries(localChanges).forEach(([productId, changes]) => {
+      const docRef = doc(firestore, "users", user.uid, "products", productId);
+      const updates: any = {
+        ...changes,
+        updatedAt: new Date().toISOString()
+      };
+
+      if (updates.price !== undefined) updates.price = Number(updates.price) || 0;
+      if (updates.stockQuantity !== undefined) updates.stockQuantity = Number(updates.stockQuantity) || 0;
+
+      updateDocumentNonBlocking(docRef, updates);
+    });
+
+    setTimeout(() => {
+      setLocalChanges({});
+      setIsSavingAll(false);
+      toast({
+        title: "Cambios Guardados",
+        description: `Se han actualizado ${totalChanges} productos exitosamente.`,
+      });
+    }, 1000);
   };
 
   return (
@@ -109,7 +139,7 @@ export default function BulkEditPage() {
       <div className="space-y-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold font-headline text-primary">Editor Rápido de Inventario</h1>
+            <h1 className="text-3xl font-bold font-headline text-primary">Editor Rápido</h1>
             <p className="text-muted-foreground">Modifica precios, stock e imágenes directamente en la lista.</p>
           </div>
           <div className="relative w-full md:max-w-md">
@@ -129,9 +159,22 @@ export default function BulkEditPage() {
               <Package className="h-4 w-4 text-accent" />
               Lista de Productos ({filteredProducts.length})
             </CardTitle>
-            <Badge variant="outline" className="bg-white font-bold text-primary">
-              Cambios pendientes: {Object.keys(localChanges).length}
-            </Badge>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="bg-white font-bold text-primary">
+                Cambios pendientes: {Object.keys(localChanges).length}
+              </Badge>
+              {Object.keys(localChanges).length > 0 && (
+                <Button 
+                  size="sm" 
+                  onClick={handleSaveAll} 
+                  disabled={isSavingAll}
+                  className="bg-accent text-accent-foreground font-black hover:bg-accent/90 gap-2"
+                >
+                  {isSavingAll ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                  GUARDAR TODO
+                </Button>
+              )}
+            </div>
           </CardHeader>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
@@ -211,7 +254,7 @@ export default function BulkEditPage() {
                             size="sm"
                             className={`gap-2 font-bold transition-all ${isDirty ? 'bg-accent text-accent-foreground hover:bg-accent/90' : 'opacity-30'}`}
                             onClick={() => handleUpdateProduct(p)}
-                            disabled={!isDirty || isUpdatingId === p.id}
+                            disabled={!isDirty || isUpdatingId === p.id || isSavingAll}
                           >
                             {isUpdatingId === p.id ? (
                               <Loader2 className="h-3 w-3 animate-spin" />
@@ -230,7 +273,6 @@ export default function BulkEditPage() {
                         <div className="flex flex-col items-center gap-2">
                           <Search className="h-12 w-12" />
                           <p className="font-bold text-lg">No se encontraron productos</p>
-                          <p className="text-sm">Prueba ajustando los términos de búsqueda.</p>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -243,21 +285,34 @@ export default function BulkEditPage() {
 
         {Object.keys(localChanges).length > 0 && (
           <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-4">
-            <Card className="bg-primary text-primary-foreground shadow-2xl border-none p-4 px-8 flex items-center gap-6 rounded-full">
+            <Card className="bg-primary text-primary-foreground shadow-2xl border-none p-4 px-6 flex items-center gap-4 rounded-full">
                <div className="flex items-center gap-2">
                  <CheckCircle2 className="h-5 w-5 text-accent" />
-                 <span className="font-bold whitespace-nowrap">
-                   Tienes {Object.keys(localChanges).length} productos modificados
+                 <span className="font-bold whitespace-nowrap text-sm">
+                   {Object.keys(localChanges).length} cambios pendientes
                  </span>
                </div>
-               <Button 
-                variant="secondary" 
-                size="sm" 
-                className="font-black text-xs"
-                onClick={() => setLocalChanges({})}
-               >
-                 DESCARTAR TODO
-               </Button>
+               <div className="flex gap-2">
+                 <Button 
+                  variant="secondary" 
+                  size="sm" 
+                  className="font-black text-xs h-9 px-4 bg-accent text-accent-foreground hover:bg-accent/90"
+                  onClick={handleSaveAll}
+                  disabled={isSavingAll}
+                 >
+                   {isSavingAll ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Save className="h-3 w-3 mr-1" />}
+                   GUARDAR TODO
+                 </Button>
+                 <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="font-bold text-xs h-9 px-4 text-white hover:bg-white/10"
+                  onClick={() => setLocalChanges({})}
+                  disabled={isSavingAll}
+                 >
+                   DESCARTAR
+                 </Button>
+               </div>
             </Card>
           </div>
         )}
