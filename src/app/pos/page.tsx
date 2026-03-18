@@ -23,22 +23,6 @@ import {
   Lock
 } from "lucide-react";
 import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogFooter,
-  DialogTrigger
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
-import { 
   useCollection, 
   useFirestore, 
   useUser, 
@@ -224,7 +208,7 @@ export default function POSPage() {
 
     const salesRef = collection(firestore, "users", user.uid, "sales");
     
-    addDocumentNonBlocking(salesRef, saleData).then((saleRef) => {
+    addDoc(salesRef, saleData).then((saleRef) => {
       if (saleRef) {
         const saleItemsRef = collection(firestore, "users", user.uid, "sales", saleRef.id, "sale_items");
         
