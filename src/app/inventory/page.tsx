@@ -48,7 +48,7 @@ import {
   FileUp,
   ImageIcon,
   AlertTriangle,
-  Smoking
+  Cigarette
 } from "lucide-react";
 import { 
   useFirestore, 
@@ -476,7 +476,7 @@ function ProductFormFields({ product, categories, selectedCategory, setSelectedC
         {selectedCategory === "Cigarrillos" && (
           <div className="grid gap-2 animate-in fade-in slide-in-from-top-2">
             <label className="text-sm font-bold flex items-center gap-1">
-              <Smoking className="h-3 w-3" />
+              <Cigarette className="h-3 w-3" />
               Tipo de Pack
             </label>
             <Select value={selectedVariant} onValueChange={setSelectedVariant}>
