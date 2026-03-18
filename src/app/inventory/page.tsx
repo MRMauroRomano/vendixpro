@@ -483,9 +483,14 @@ function ProductFormFields({ product, categories, selectedCategory, setSelectedC
               <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="BOX 20">BOX 20</SelectItem>
+                <SelectItem value="BOX 12">BOX 12</SelectItem>
                 <SelectItem value="BOX 10">BOX 10</SelectItem>
+                <SelectItem value="SOFT 20">SOFT 20</SelectItem>
                 <SelectItem value="COMUN 20">COMUN 20</SelectItem>
                 <SelectItem value="COMUN 10">COMUN 10</SelectItem>
+                <SelectItem value="100's BOX">100's BOX</SelectItem>
+                <SelectItem value="CON CAPSULA">CON CAPSULA</SelectItem>
+                <SelectItem value="OTRO">OTRO</SelectItem>
               </SelectContent>
             </Select>
           </div>
