@@ -15,7 +15,8 @@ import {
   History, 
   Loader2,
   CalendarDays,
-  ArrowLeft
+  ArrowLeft,
+  Info
 } from "lucide-react";
 import { 
   useFirestore, 
@@ -27,6 +28,12 @@ import { collection, query, orderBy, limit } from "firebase/firestore";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
+import { 
+  Tooltip, 
+  TooltipContent, 
+  TooltipProvider, 
+  TooltipTrigger 
+} from "@/components/ui/tooltip";
 import Link from "next/link";
 
 export default function CashHistoryPage() {
@@ -79,7 +86,7 @@ export default function CashHistoryPage() {
                     <TableHead className="text-right font-bold">Teórico</TableHead>
                     <TableHead className="text-right font-bold">Físico</TableHead>
                     <TableHead className="text-right font-bold">Diferencia</TableHead>
-                    <TableHead className="font-bold">Detalle de Medios</TableHead>
+                    <TableHead className="font-bold">Resumen de Medios</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -100,10 +107,32 @@ export default function CashHistoryPage() {
                       <TableCell className="text-right font-bold">${(s.actualClosingBalance || 0).toLocaleString()}</TableCell>
                       <TableCell className={`text-right font-black ${s.difference < 0 ? 'text-red-500' : s.difference > 0 ? 'text-accent' : 'text-primary'}`}>
                         ${(s.difference || 0).toLocaleString()}
-                        {s.difference !== 0 && (s.difference < 0 ? ' (Faltante)' : ' (Sobrante)')}
+                        <div className="text-[9px] opacity-70">
+                           {s.difference < 0 ? '(Faltante)' : s.difference > 0 ? '(Sobrante)' : '(Exacto)'}
+                        </div>
                       </TableCell>
-                      <TableCell className="text-[10px] text-muted-foreground max-w-[200px] truncate">
-                        {s.notes || "Sin detalles"}
+                      <TableCell>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="flex items-center gap-2 cursor-help text-xs text-muted-foreground">
+                                <Info className="h-4 w-4 text-primary" />
+                                <span className="max-w-[150px] truncate">{s.notes || "Ver detalle"}</span>
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent className="p-4 w-64 bg-card border-2 shadow-xl">
+                              <p className="text-xs font-black uppercase text-primary mb-2 border-b pb-1">Desglose del Arqueo</p>
+                              <div className="space-y-1 text-[11px]">
+                                {s.notes ? s.notes.split('|').map((note: string, i: number) => (
+                                  <div key={i} className="flex justify-between">
+                                    <span className="text-muted-foreground">{note.split(':')[0]}:</span>
+                                    <span className="font-bold text-primary">{note.split(':')[1]}</span>
+                                  </div>
+                                )) : <p>No hay notas de cierre disponibles.</p>}
+                              </div>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                       </TableCell>
                     </TableRow>
                   ))}

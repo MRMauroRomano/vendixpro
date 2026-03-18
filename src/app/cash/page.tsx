@@ -29,7 +29,8 @@ import {
   UserCheck,
   Banknote,
   Calculator,
-  AlertCircle
+  AlertCircle,
+  Receipt
 } from "lucide-react";
 import { 
   useFirestore, 
@@ -86,7 +87,7 @@ export default function CashControlPage() {
   const { data: currentExpenses } = useCollection(expensesQuery);
 
   const stats = useMemo(() => {
-    if (!activeSession) return { cashSales: 0, cardSales: 0, qrSales: 0, creditSales: 0, totalExpenses: 0, expected: 0 };
+    if (!activeSession) return { cashSales: 0, cardSales: 0, qrSales: 0, creditSales: 0, totalExpenses: 0, expected: 0, totalOperations: 0 };
 
     const sales = currentSales || [];
     
@@ -109,10 +110,10 @@ export default function CashControlPage() {
     const totalExpenses = (currentExpenses || [])
       .reduce((acc, e) => acc + (e.amount || 0), 0);
 
-    // El saldo esperado en CAJA FISICA solo contempla Efectivo y Gastos
     const expected = (activeSession.openingBalance || 0) + cashSales - totalExpenses;
+    const totalOperations = sales.length + (currentExpenses || []).length;
 
-    return { cashSales, cardSales, qrSales, creditSales, totalExpenses, expected };
+    return { cashSales, cardSales, qrSales, creditSales, totalExpenses, expected, totalOperations };
   }, [activeSession, currentSales, currentExpenses]);
 
   const handleOpenCash = () => {
@@ -147,7 +148,7 @@ export default function CashControlPage() {
       expectedClosingBalance: stats.expected,
       actualClosingBalance: actualCash,
       difference: difference,
-      notes: `Efectivo: $${stats.cashSales} | Tarjeta: $${stats.cardSales} | QR: $${stats.qrSales} | Gastos: $${stats.totalExpenses}`
+      notes: `Efectivo: $${stats.cashSales} | Tarjeta: $${stats.cardSales} | QR: $${stats.qrSales} | Gastos: $${stats.totalExpenses} | Fiado: $${stats.creditSales}`
     });
 
     toast({ title: "Caja Cerrada", description: "Arqueo completado y turno finalizado." });
@@ -197,10 +198,10 @@ export default function CashControlPage() {
             </Dialog>
           ) : (
             <div className="flex gap-2">
-              <Button asChild variant="outline" className="gap-2 h-12">
+              <Button asChild variant="outline" className="gap-2 h-12 border-primary/20">
                 <Link href="/cash/history">
                    <History className="h-4 w-4" />
-                   Historial
+                   Ver Historial
                 </Link>
               </Button>
               <Dialog open={isClosingDialogOpen} onOpenChange={setIsClosingDialogOpen}>
@@ -264,7 +265,7 @@ export default function CashControlPage() {
                       <Input 
                         type="number" 
                         placeholder="Monto contado físicamente..."
-                        className="text-2xl font-black h-14 border-destructive ring-destructive/20"
+                        className="text-2xl font-black h-14 border-destructive focus:ring-destructive/20"
                         value={actualCash || ""}
                         onChange={(e) => setActualCash(Number(e.target.value))}
                         autoFocus
@@ -282,36 +283,124 @@ export default function CashControlPage() {
         </div>
 
         {activeSession ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Card className="bg-primary text-primary-foreground border-none shadow-xl col-span-1 md:col-span-2 lg:col-span-1">
-              <CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase tracking-widest opacity-70 flex items-center gap-2"><Banknote className="h-3 w-3" /> Saldo Teórico (Caja)</CardTitle></CardHeader>
-              <CardContent><div className="text-4xl font-black">${stats.expected.toLocaleString()}</div></CardContent>
-            </Card>
-            
-            <Card className="border-2">
-              <CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-muted-foreground flex gap-2 items-center"><ArrowUpCircle className="h-3 w-3 text-accent" /> Ventas Efectivo</CardTitle></CardHeader>
-              <CardContent><div className="text-2xl font-black text-accent">${stats.cashSales.toLocaleString()}</div></CardContent>
-            </Card>
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <Card className="bg-primary text-primary-foreground border-none shadow-xl col-span-1 md:col-span-2 lg:col-span-1">
+                <CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase tracking-widest opacity-70 flex items-center gap-2"><Banknote className="h-3 w-3" /> Saldo Teórico (Caja)</CardTitle></CardHeader>
+                <CardContent><div className="text-4xl font-black">${stats.expected.toLocaleString()}</div></CardContent>
+              </Card>
+              
+              <Card className="border-2">
+                <CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-muted-foreground flex gap-2 items-center"><ArrowUpCircle className="h-3 w-3 text-accent" /> Ventas Efectivo</CardTitle></CardHeader>
+                <CardContent><div className="text-2xl font-black text-accent">${stats.cashSales.toLocaleString()}</div></CardContent>
+              </Card>
 
-            <Card className="border-2">
-              <CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-muted-foreground flex gap-2 items-center"><CreditCard className="h-3 w-3 text-blue-500" /> Ventas Tarjeta</CardTitle></CardHeader>
-              <CardContent><div className="text-2xl font-black text-blue-500">${stats.cardSales.toLocaleString()}</div></CardContent>
-            </Card>
+              <Card className="border-2">
+                <CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-muted-foreground flex gap-2 items-center"><CreditCard className="h-3 w-3 text-blue-500" /> Ventas Tarjeta</CardTitle></CardHeader>
+                <CardContent><div className="text-2xl font-black text-blue-500">${stats.cardSales.toLocaleString()}</div></CardContent>
+              </Card>
 
-            <Card className="border-2">
-              <CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-muted-foreground flex gap-2 items-center"><QrCode className="h-3 w-3 text-purple-500" /> Ventas QR/Trans</CardTitle></CardHeader>
-              <CardContent><div className="text-2xl font-black text-purple-500">${stats.qrSales.toLocaleString()}</div></CardContent>
-            </Card>
+              <Card className="border-2">
+                <CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-muted-foreground flex gap-2 items-center"><QrCode className="h-3 w-3 text-purple-500" /> Ventas QR/Trans</CardTitle></CardHeader>
+                <CardContent><div className="text-2xl font-black text-purple-500">${stats.qrSales.toLocaleString()}</div></CardContent>
+              </Card>
+            </div>
 
-            <Card className="border-2">
-              <CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-muted-foreground flex gap-2 items-center"><UserCheck className="h-3 w-3 text-orange-500" /> Fiado (Cta Cte)</CardTitle></CardHeader>
-              <CardContent><div className="text-2xl font-black text-orange-500">${stats.creditSales.toLocaleString()}</div></CardContent>
-            </Card>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <Card className="lg:col-span-2 border-2">
+                <CardHeader className="bg-muted/10 border-b">
+                  <CardTitle className="text-lg font-bold flex items-center gap-2">
+                    <Receipt className="h-5 w-5 text-primary" />
+                    Resumen Operativo del Turno
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-6">
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center p-3 rounded-lg border bg-muted/5">
+                      <div className="flex items-center gap-3">
+                        <div className="bg-primary/10 p-2 rounded-full"><Unlock className="h-4 w-4 text-primary" /></div>
+                        <div>
+                          <p className="text-[10px] font-bold uppercase text-muted-foreground">Fondo Inicial</p>
+                          <p className="text-sm font-bold">Dinero con el que abrió la caja</p>
+                        </div>
+                      </div>
+                      <span className="text-lg font-black">${(activeSession.openingBalance || 0).toLocaleString()}</span>
+                    </div>
 
-            <Card className="border-2">
-              <CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-muted-foreground flex gap-2 items-center"><ArrowDownCircle className="h-3 w-3 text-red-500" /> Gastos de Caja</CardTitle></CardHeader>
-              <CardContent><div className="text-2xl font-black text-red-500">${stats.totalExpenses.toLocaleString()}</div></CardContent>
-            </Card>
+                    <div className="flex justify-between items-center p-3 rounded-lg border bg-accent/5 border-accent/20">
+                      <div className="flex items-center gap-3">
+                        <div className="bg-accent/10 p-2 rounded-full"><ArrowUpCircle className="h-4 w-4 text-accent" /></div>
+                        <div>
+                          <p className="text-[10px] font-bold uppercase text-accent">Entradas (Efectivo)</p>
+                          <p className="text-sm font-bold">Ventas cobradas en mano</p>
+                        </div>
+                      </div>
+                      <span className="text-lg font-black text-accent">+ ${(stats.cashSales || 0).toLocaleString()}</span>
+                    </div>
+
+                    <div className="flex justify-between items-center p-3 rounded-lg border bg-red-50 border-red-100">
+                      <div className="flex items-center gap-3">
+                        <div className="bg-red-100 p-2 rounded-full"><ArrowDownCircle className="h-4 w-4 text-red-500" /></div>
+                        <div>
+                          <p className="text-[10px] font-bold uppercase text-red-500">Salidas (Gastos)</p>
+                          <p className="text-sm font-bold">Retiros de dinero del cajón</p>
+                        </div>
+                      </div>
+                      <span className="text-lg font-black text-red-500">- ${(stats.totalExpenses || 0).toLocaleString()}</span>
+                    </div>
+
+                    <Separator />
+
+                    <div className="flex justify-between items-center p-4 rounded-xl bg-primary text-primary-foreground shadow-inner">
+                      <div className="flex items-center gap-3">
+                        <div className="bg-white/20 p-2 rounded-full"><Calculator className="h-5 w-5" /></div>
+                        <span className="text-sm font-black uppercase tracking-wider">Saldo Final Esperado en Efectivo</span>
+                      </div>
+                      <span className="text-3xl font-black">${stats.expected.toLocaleString()}</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <div className="space-y-4">
+                <Card className="border-2">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-[10px] font-black uppercase text-muted-foreground flex gap-2 items-center">
+                      <UserCheck className="h-3 w-3 text-orange-500" /> Fiado (Cta Cte)
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-black text-orange-500">${stats.creditSales.toLocaleString()}</div>
+                    <p className="text-[10px] text-muted-foreground mt-1">Ventas no cobradas, a cuenta de clientes.</p>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-2 bg-muted/5">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-[10px] font-black uppercase text-muted-foreground">Estado del Turno</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-muted-foreground">Operaciones:</span>
+                      <span className="font-bold">{stats.totalOperations}</span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-muted-foreground">Inició el:</span>
+                      <span className="font-bold">{new Date(activeSession.openedAt).toLocaleDateString()}</span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-muted-foreground">Hora:</span>
+                      <span className="font-bold">{new Date(activeSession.openedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                    </div>
+                    <div className="pt-2">
+                      <span className="text-[10px] font-black px-2 py-1 bg-accent text-accent-foreground rounded-full animate-pulse">
+                        EN CURSO
+                      </span>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
           </div>
         ) : (
           <Card className="p-16 text-center border-2 border-dashed bg-muted/30">
