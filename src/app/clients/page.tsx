@@ -28,7 +28,8 @@ import {
   DollarSign, 
   Loader2, 
   Trash2, 
-  UserPlus
+  UserPlus,
+  ArrowRightCircle
 } from "lucide-react";
 import { 
   useFirestore, 
@@ -36,7 +37,8 @@ import {
   useMemoFirebase, 
   useCollection, 
   addDocumentNonBlocking, 
-  deleteDocumentNonBlocking 
+  deleteDocumentNonBlocking,
+  updateDocumentNonBlocking
 } from "@/firebase";
 import { collection, doc, query, orderBy, CollectionReference } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
@@ -47,9 +49,12 @@ export default function ClientsPage() {
   const { toast } = useToast();
   
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isPaymentOpen, setIsPaymentOpen] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
+  const [paymentAmount, setPaymentAmount] = useState<number>(0);
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Referencia base de la colección (necesaria para escrituras/addDoc)
+  // Referencia base de la colección
   const baseCustomersRef = useMemoFirebase(() => {
     if (!firestore || !user?.uid) return null;
     return collection(firestore, "users", user.uid, "customers");
@@ -80,7 +85,6 @@ export default function ClientsPage() {
 
   const handleSaveCustomer = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    // CRITICAL: Se debe usar la referencia de colección base, no la Query.
     if (!user || !baseCustomersRef) return;
 
     const formData = new FormData(e.currentTarget);
@@ -103,6 +107,27 @@ export default function ClientsPage() {
     });
     
     setIsAddOpen(false);
+  };
+
+  const handleCollectPayment = () => {
+    if (!user || !firestore || !selectedCustomer || paymentAmount <= 0) return;
+
+    const newBalance = Math.max(0, (selectedCustomer.currentBalance || 0) - paymentAmount);
+    const docRef = doc(firestore, "users", user.uid, "customers", selectedCustomer.id);
+
+    updateDocumentNonBlocking(docRef, {
+      currentBalance: newBalance,
+      lastPaymentAt: new Date().toISOString()
+    });
+
+    toast({
+      title: "Pago Registrado",
+      description: `Se han cobrado $${paymentAmount.toLocaleString()} de ${selectedCustomer.name}. Nuevo saldo: $${newBalance.toLocaleString()}`,
+    });
+
+    setIsPaymentOpen(false);
+    setSelectedCustomer(null);
+    setPaymentAmount(0);
   };
 
   const handleDelete = (customerId: string) => {
@@ -147,7 +172,6 @@ export default function ClientsPage() {
                       <Input name="balance" type="number" step="0.01" defaultValue="0" />
                     </div>
                   </div>
-                  <p className="text-[10px] text-muted-foreground italic">El saldo inicial representa la deuda actual del cliente si la tuviera.</p>
                 </div>
                 <DialogFooter>
                   <Button type="submit" className="w-full h-11">Guardar Cliente</Button>
@@ -231,7 +255,17 @@ export default function ClientsPage() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
-                          <Button variant="outline" size="sm" className="gap-1 text-accent border-accent/20 hover:bg-accent/5 font-bold">
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="gap-1 text-accent border-accent/20 hover:bg-accent/5 font-bold"
+                            onClick={() => {
+                              setSelectedCustomer(client);
+                              setIsPaymentOpen(true);
+                              setPaymentAmount(client.currentBalance || 0);
+                            }}
+                            disabled={(client.currentBalance || 0) <= 0}
+                          >
                             <DollarSign className="h-3 w-3" />
                             Cobrar
                           </Button>
@@ -259,6 +293,51 @@ export default function ClientsPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Diálogo para cobrar pago */}
+      <Dialog open={isPaymentOpen} onOpenChange={setIsPaymentOpen}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ArrowRightCircle className="h-5 w-5 text-accent" />
+              Registrar Cobro
+            </DialogTitle>
+          </DialogHeader>
+          {selectedCustomer && (
+            <div className="py-4 space-y-4">
+              <div className="bg-muted p-4 rounded-lg">
+                <p className="text-xs text-muted-foreground uppercase font-bold">Cliente</p>
+                <p className="text-lg font-black">{selectedCustomer.name}</p>
+                <div className="flex justify-between items-center mt-2 pt-2 border-t">
+                  <span className="text-sm">Deuda Actual:</span>
+                  <span className="text-lg font-black text-red-500">${(selectedCustomer.currentBalance || 0).toLocaleString()}</span>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-bold">Monto a Cobrar ($)</label>
+                <Input 
+                  type="number" 
+                  className="text-2xl font-black h-14 border-primary focus:ring-accent"
+                  value={paymentAmount || ""}
+                  onChange={(e) => setPaymentAmount(Number(e.target.value))}
+                  autoFocus
+                />
+                <p className="text-[10px] text-muted-foreground italic">El monto ingresado se restará de la deuda total.</p>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button 
+              className="w-full h-12 text-lg font-bold bg-accent hover:bg-accent/90" 
+              onClick={handleCollectPayment}
+              disabled={paymentAmount <= 0}
+            >
+              Confirmar Cobro
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 }
