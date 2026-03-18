@@ -21,7 +21,7 @@ import {
   ImageIcon,
   DollarSign,
   CheckCircle2,
-  AlertCircle
+  XCircle
 } from "lucide-react";
 import { 
   useFirestore, 
@@ -90,6 +90,7 @@ export default function BulkEditPage() {
 
     updateDocumentNonBlocking(docRef, updates);
     
+    // Simular un pequeño feedback visual
     setTimeout(() => {
       setIsUpdatingId(null);
       setLocalChanges(prev => {
@@ -100,18 +101,18 @@ export default function BulkEditPage() {
       
       toast({ 
         title: "Producto Actualizado", 
-        description: `${product.name} ha sido guardado.` 
+        description: `${product.name} ha sido guardado correctamente.` 
       });
-    }, 400);
+    }, 500);
   };
 
-  const handleSaveAll = async () => {
+  const handleSaveAll = () => {
     if (!user || !firestore || Object.keys(localChanges).length === 0) return;
 
     setIsSavingAll(true);
-    const totalChanges = Object.keys(localChanges).length;
+    const entries = Object.entries(localChanges);
 
-    Object.entries(localChanges).forEach(([productId, changes]) => {
+    entries.forEach(([productId, changes]) => {
       const docRef = doc(firestore, "users", user.uid, "products", productId);
       const updates: any = {
         ...changes,
@@ -129,9 +130,9 @@ export default function BulkEditPage() {
       setIsSavingAll(false);
       toast({
         title: "Cambios Guardados",
-        description: `Se han actualizado ${totalChanges} productos exitosamente.`,
+        description: `Se han actualizado ${entries.length} productos exitosamente.`,
       });
-    }, 1000);
+    }, 1200);
   };
 
   return (
@@ -139,7 +140,7 @@ export default function BulkEditPage() {
       <div className="space-y-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold font-headline text-primary">Editor Rápido</h1>
+            <h1 className="text-3xl font-bold font-headline text-primary">Edición Rápida</h1>
             <p className="text-muted-foreground">Modifica precios, stock e imágenes directamente en la lista.</p>
           </div>
           <div className="relative w-full md:max-w-md">
@@ -154,13 +155,13 @@ export default function BulkEditPage() {
         </div>
 
         <Card className="border-2 shadow-xl overflow-hidden">
-          <CardHeader className="bg-muted/30 border-b py-3 flex flex-row items-center justify-between">
+          <CardHeader className="bg-muted/30 border-b py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
             <CardTitle className="text-sm font-black uppercase tracking-widest flex items-center gap-2">
               <Package className="h-4 w-4 text-accent" />
               Lista de Productos ({filteredProducts.length})
             </CardTitle>
-            <div className="flex items-center gap-2">
-              <Badge variant="outline" className="bg-white font-bold text-primary">
+            <div className="flex items-center gap-3">
+              <Badge variant="outline" className="bg-white font-bold text-primary px-3 py-1">
                 Cambios pendientes: {Object.keys(localChanges).length}
               </Badge>
               {Object.keys(localChanges).length > 0 && (
@@ -168,7 +169,7 @@ export default function BulkEditPage() {
                   size="sm" 
                   onClick={handleSaveAll} 
                   disabled={isSavingAll}
-                  className="bg-accent text-accent-foreground font-black hover:bg-accent/90 gap-2"
+                  className="bg-accent text-accent-foreground font-black hover:bg-accent/90 gap-2 shadow-md"
                 >
                   {isSavingAll ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                   GUARDAR TODO
@@ -182,10 +183,10 @@ export default function BulkEditPage() {
                 <TableHeader className="bg-muted/50">
                   <TableRow>
                     <TableHead className="w-[80px]">Imagen</TableHead>
-                    <TableHead className="min-w-[200px]">Producto / SKU</TableHead>
+                    <TableHead className="min-w-[180px]">Producto</TableHead>
                     <TableHead className="w-[180px]">Precio ($)</TableHead>
-                    <TableHead className="w-[150px]">Stock (u.)</TableHead>
-                    <TableHead className="min-w-[350px]">URL Imagen</TableHead>
+                    <TableHead className="w-[140px]">Stock (u.)</TableHead>
+                    <TableHead className="min-w-[300px]">URL Imagen</TableHead>
                     <TableHead className="text-right">Acción</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -194,7 +195,7 @@ export default function BulkEditPage() {
                     <TableRow>
                       <TableCell colSpan={6} className="h-64 text-center">
                         <Loader2 className="h-10 w-10 animate-spin mx-auto text-primary" />
-                        <p className="mt-2 text-muted-foreground">Cargando productos...</p>
+                        <p className="mt-2 text-muted-foreground font-medium">Cargando catálogo...</p>
                       </TableCell>
                     </TableRow>
                   ) : filteredProducts.map((p) => {
@@ -202,7 +203,7 @@ export default function BulkEditPage() {
                     const isDirty = Object.keys(changes).length > 0;
                     
                     return (
-                      <TableRow key={p.id} className={isDirty ? "bg-accent/5" : ""}>
+                      <TableRow key={p.id} className={`${isDirty ? "bg-accent/5" : ""} hover:bg-muted/10 transition-colors`}>
                         <TableCell>
                           <div className="h-10 w-10 rounded-md border bg-muted overflow-hidden">
                             <img 
@@ -214,9 +215,8 @@ export default function BulkEditPage() {
                         </TableCell>
                         <TableCell>
                           <div className="flex flex-col">
-                            <span className="font-bold text-sm leading-tight">{p.name}</span>
-                            <span className="text-[10px] font-mono text-muted-foreground">{p.sku || 'SIN SKU'}</span>
-                            <Badge variant="secondary" className="w-fit text-[8px] mt-1 h-4 px-1">{p.category || 'General'}</Badge>
+                            <span className="font-bold text-sm leading-tight truncate max-w-[160px]">{p.name}</span>
+                            <span className="text-[10px] font-mono text-muted-foreground uppercase">{p.sku || 'SIN SKU'}</span>
                           </div>
                         </TableCell>
                         <TableCell>
@@ -224,8 +224,8 @@ export default function BulkEditPage() {
                             <DollarSign className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
                             <Input 
                               type="number"
-                              className={`pl-6 h-9 font-bold ${isDirty && changes.price !== undefined ? 'border-accent ring-1 ring-accent' : ''}`}
-                              value={changes.price ?? p.price ?? ""}
+                              className={`pl-6 h-9 font-bold w-full ${isDirty && changes.price !== undefined ? 'border-accent ring-1 ring-accent bg-accent/5' : ''}`}
+                              value={changes.price ?? p.price ?? 0}
                               onChange={(e) => handleLocalChange(p.id, 'price', e.target.value)}
                             />
                           </div>
@@ -233,8 +233,8 @@ export default function BulkEditPage() {
                         <TableCell>
                           <Input 
                             type="number"
-                            className={`h-9 font-bold text-center ${isDirty && changes.stockQuantity !== undefined ? 'border-accent ring-1 ring-accent' : ''}`}
-                            value={changes.stockQuantity ?? p.stockQuantity ?? ""}
+                            className={`h-9 font-bold text-center w-full ${isDirty && changes.stockQuantity !== undefined ? 'border-accent ring-1 ring-accent bg-accent/5' : ''}`}
+                            value={changes.stockQuantity ?? p.stockQuantity ?? 0}
                             onChange={(e) => handleLocalChange(p.id, 'stockQuantity', e.target.value)}
                           />
                         </TableCell>
@@ -242,7 +242,7 @@ export default function BulkEditPage() {
                           <div className="relative">
                             <ImageIcon className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
                             <Input 
-                              className={`pl-7 h-9 text-xs font-mono truncate ${isDirty && changes.imageUrl !== undefined ? 'border-accent ring-1 ring-accent' : ''}`}
+                              className={`pl-7 h-9 text-[11px] font-mono w-full ${isDirty && changes.imageUrl !== undefined ? 'border-accent ring-1 ring-accent bg-accent/5' : ''}`}
                               placeholder="https://..."
                               value={changes.imageUrl ?? p.imageUrl ?? ""}
                               onChange={(e) => handleLocalChange(p.id, 'imageUrl', e.target.value)}
@@ -252,7 +252,7 @@ export default function BulkEditPage() {
                         <TableCell className="text-right">
                           <Button 
                             size="sm"
-                            className={`gap-2 font-bold transition-all ${isDirty ? 'bg-accent text-accent-foreground hover:bg-accent/90' : 'opacity-30'}`}
+                            className={`gap-2 font-bold h-9 transition-all ${isDirty ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'opacity-20 pointer-events-none'}`}
                             onClick={() => handleUpdateProduct(p)}
                             disabled={!isDirty || isUpdatingId === p.id || isSavingAll}
                           >
@@ -261,18 +261,18 @@ export default function BulkEditPage() {
                             ) : (
                               <Save className="h-3 w-3" />
                             )}
-                            Guardar
+                            <span className="hidden sm:inline">Guardar</span>
                           </Button>
                         </TableCell>
                       </TableRow>
                     );
                   })}
-                  {filteredProducts.length === 0 && !isLoading && (
+                  {!isLoading && filteredProducts.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={6} className="h-64 text-center opacity-40">
-                        <div className="flex flex-col items-center gap-2">
+                        <div className="flex flex-col items-center gap-3">
                           <Search className="h-12 w-12" />
-                          <p className="font-bold text-lg">No se encontraron productos</p>
+                          <p className="font-bold text-lg">No se encontraron coincidencias</p>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -284,32 +284,34 @@ export default function BulkEditPage() {
         </Card>
 
         {Object.keys(localChanges).length > 0 && (
-          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-4">
-            <Card className="bg-primary text-primary-foreground shadow-2xl border-none p-4 px-6 flex items-center gap-4 rounded-full">
-               <div className="flex items-center gap-2">
-                 <CheckCircle2 className="h-5 w-5 text-accent" />
-                 <span className="font-bold whitespace-nowrap text-sm">
-                   {Object.keys(localChanges).length} cambios pendientes
-                 </span>
+          <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-6 duration-500">
+            <Card className="bg-primary text-primary-foreground shadow-2xl border-none p-5 px-8 flex flex-col sm:flex-row items-center gap-6 rounded-2xl">
+               <div className="flex items-center gap-3">
+                 <CheckCircle2 className="h-6 w-6 text-accent" />
+                 <div className="flex flex-col">
+                   <span className="font-black text-sm uppercase tracking-wider">
+                     {Object.keys(localChanges).length} cambios pendientes
+                   </span>
+                   <span className="text-[10px] opacity-70">Los cambios no se aplicarán hasta que guardes.</span>
+                 </div>
                </div>
-               <div className="flex gap-2">
+               <div className="flex gap-3 w-full sm:w-auto">
                  <Button 
                   variant="secondary" 
-                  size="sm" 
-                  className="font-black text-xs h-9 px-4 bg-accent text-accent-foreground hover:bg-accent/90"
+                  className="flex-1 sm:flex-none font-black text-xs h-10 px-6 bg-accent text-accent-foreground hover:bg-accent/90 gap-2"
                   onClick={handleSaveAll}
                   disabled={isSavingAll}
                  >
-                   {isSavingAll ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Save className="h-3 w-3 mr-1" />}
+                   {isSavingAll ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
                    GUARDAR TODO
                  </Button>
                  <Button 
                   variant="ghost" 
-                  size="sm" 
-                  className="font-bold text-xs h-9 px-4 text-white hover:bg-white/10"
+                  className="flex-1 sm:flex-none font-bold text-xs h-10 px-6 text-white hover:bg-white/10 gap-2 border border-white/20"
                   onClick={() => setLocalChanges({})}
                   disabled={isSavingAll}
                  >
+                   <XCircle className="h-3 w-3" />
                    DESCARTAR
                  </Button>
                </div>

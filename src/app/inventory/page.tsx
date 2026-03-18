@@ -1,7 +1,6 @@
-
 "use client";
 
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useMemo } from "react";
 import { AppLayout } from "@/components/layout/app-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -131,14 +130,14 @@ export default function InventoryPage() {
     if (editingProduct) {
       const docRef = doc(firestore, "users", user.uid, "products", editingProduct.id);
       updateDocumentNonBlocking(docRef, productData);
-      toast({ title: "Producto Actualizado", description: `${name} guardado.` });
+      toast({ title: "Producto Actualizado", description: `${name} guardado con éxito.` });
       setEditingProduct(null);
     } else {
       addDocumentNonBlocking(productsRef, { 
         ...productData, 
         createdAt: new Date().toISOString() 
       });
-      toast({ title: "Producto Agregado", description: `${name} guardado.` });
+      toast({ title: "Producto Agregado", description: `${name} guardado con éxito.` });
       setIsAddOpen(false);
     }
     
@@ -163,44 +162,43 @@ export default function InventoryPage() {
     });
 
     toast({ 
-      title: "Limpieza Iniciada", 
+      title: "Limpieza en curso", 
       description: `Se están eliminando ${products.length} productos.` 
     });
     setIsDeletingAll(false);
   };
 
-  const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImportExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user?.uid || !productsRef) return;
 
     setIsImporting(true);
     const reader = new FileReader();
 
-    reader.onload = async (evt) => {
+    reader.onload = (evt) => {
       try {
         const bstr = evt.target?.result;
-        if (!bstr) throw new Error("File is empty");
+        if (!bstr) throw new Error("Archivo vacío");
         
         const wb = XLSX.read(bstr, { type: "binary" });
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
-        if (!ws) throw new Error("Sheet not found");
+        if (!ws) throw new Error("Hoja no encontrada");
 
         const data = XLSX.utils.sheet_to_json(ws) as any[];
+        let count = 0;
 
-        let importedCount = 0;
-
-        for (const rawRow of data) {
+        data.forEach((rawRow, index) => {
           const row: any = {};
           Object.keys(rawRow).forEach(key => {
             row[key.toLowerCase().trim()] = rawRow[key];
           });
 
           const name = row["nombre del producto"] || row["nombre"] || row["producto"] || row["product name"];
-          const sku = row["sku"] || row["codigo"] || row["code"] || `SKU-${Date.now()}-${importedCount}`;
+          const sku = row["sku"] || row["codigo"] || row["code"] || `SKU-IMP-${Date.now()}-${index}`;
           
           let priceStr = String(row["precio"] || row["price"] || "0");
-          const price = parseFloat(priceStr.replace(/[^0-9.-]+/g, ""));
+          const price = parseFloat(priceStr.replace(/[^0-9.-]+/g, "")) || 0;
           
           let stockStr = String(row["stock"] || "0");
           const stock = parseFloat(stockStr.replace(/[^0-9.-]+/g, "")) || 0;
@@ -211,7 +209,7 @@ export default function InventoryPage() {
             addDocumentNonBlocking(productsRef, {
               name,
               sku: String(sku),
-              price: isNaN(price) ? 0 : price,
+              price,
               stockQuantity: stock,
               unit,
               category: "Importado",
@@ -220,20 +218,19 @@ export default function InventoryPage() {
               createdAt: new Date().toISOString(),
               updatedAt: new Date().toISOString()
             });
-            importedCount++;
+            count++;
           }
-        }
+        });
 
         toast({
           title: "Importación Finalizada",
-          description: `Se han importado ${importedCount} productos con éxito.`,
+          description: `Se han procesado ${count} productos correctamente.`,
         });
-      } catch (error) {
-        console.error("Error importing excel:", error);
+      } catch (err) {
         toast({
           variant: "destructive",
           title: "Error al importar",
-          description: "No se pudo procesar el archivo. Revisa que el formato sea correcto.",
+          description: "Asegúrate de que el formato sea .xlsx y tenga las columnas correctas.",
         });
       } finally {
         setIsImporting(false);
@@ -250,7 +247,7 @@ export default function InventoryPage() {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold font-headline text-primary">Inventario</h1>
-            <p className="text-muted-foreground">Gestione sus productos, precios y stock.</p>
+            <p className="text-muted-foreground">Gestione sus productos, precios y stock en tiempo real.</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <input 
@@ -272,17 +269,17 @@ export default function InventoryPage() {
                 <AlertDialogHeader>
                   <AlertDialogTitle className="flex items-center gap-2">
                     <AlertTriangle className="h-5 w-5 text-red-500" />
-                    ¿Estás absolutamente seguro?
+                    ¿Está seguro de eliminar TODO?
                   </AlertDialogTitle>
                   <AlertDialogDescription>
-                    Esta acción eliminará permanentemente todos los productos de tu inventario.
-                    No podrás deshacer esta acción una vez iniciada.
+                    Esta acción borrará permanentemente todos los productos de su inventario. 
+                    No podrá deshacer este cambio.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancelar</AlertDialogCancel>
                   <AlertDialogAction onClick={handleDeleteAll} className="bg-red-600 hover:bg-red-700">
-                    Sí, eliminar todo
+                    Sí, eliminar todo el inventario
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
@@ -300,15 +297,15 @@ export default function InventoryPage() {
 
             <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
               <DialogTrigger asChild>
-                <Button className="gap-2 bg-accent text-accent-foreground hover:bg-accent/90">
+                <Button className="gap-2 bg-accent text-accent-foreground hover:bg-accent/90 shadow-md">
                   <Plus className="h-4 w-4" />
                   Nuevo Producto
                 </Button>
               </DialogTrigger>
-              <DialogContent className="sm:max-w-[425px]">
+              <DialogContent className="sm:max-w-[450px]">
                 <form onSubmit={handleSaveProduct}>
                   <DialogHeader>
-                    <DialogTitle>Agregar Nuevo Producto</DialogTitle>
+                    <DialogTitle>Registrar Producto</DialogTitle>
                   </DialogHeader>
                   <ProductFormFields 
                     categories={categories} 
@@ -317,15 +314,15 @@ export default function InventoryPage() {
                     isVariablePrice={isVariablePrice}
                     setIsVariablePrice={setIsVariablePrice}
                   />
-                  <DialogFooter>
-                    <Button type="submit" className="w-full h-11">Guardar Producto</Button>
+                  <DialogFooter className="mt-4">
+                    <Button type="submit" className="w-full h-11 font-bold">Guardar Producto</Button>
                   </DialogFooter>
                 </form>
               </DialogContent>
             </Dialog>
 
             <Dialog open={!!editingProduct} onOpenChange={(open) => !open && setEditingProduct(null)}>
-              <DialogContent className="sm:max-w-[425px]">
+              <DialogContent className="sm:max-w-[450px]">
                 {editingProduct && (
                   <form onSubmit={handleSaveProduct}>
                     <DialogHeader>
@@ -339,8 +336,8 @@ export default function InventoryPage() {
                       isVariablePrice={isVariablePrice}
                       setIsVariablePrice={setIsVariablePrice}
                     />
-                    <DialogFooter>
-                      <Button type="submit" className="w-full h-11">Actualizar Producto</Button>
+                    <DialogFooter className="mt-4">
+                      <Button type="submit" className="w-full h-11 font-bold">Actualizar Cambios</Button>
                     </DialogFooter>
                   </form>
                 )}
@@ -352,7 +349,7 @@ export default function InventoryPage() {
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
           <Input 
-            placeholder="Buscar por nombre o SKU..." 
+            placeholder="Filtrar por nombre o SKU..." 
             className="pl-12 h-12 text-base shadow-sm bg-white" 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -376,7 +373,7 @@ export default function InventoryPage() {
               </TableHeader>
               <TableBody>
                 {filteredProducts.map((product) => (
-                  <TableRow key={product.id}>
+                  <TableRow key={product.id} className="hover:bg-muted/10 transition-colors">
                     <TableCell>
                       <div className="h-10 w-10 rounded-md overflow-hidden bg-muted border">
                         <img 
@@ -391,15 +388,15 @@ export default function InventoryPage() {
                         <span className="font-bold text-sm">{product.name}</span>
                         <div className="flex gap-2 items-center">
                           <span className="text-[10px] text-muted-foreground font-mono">{product.sku}</span>
-                          <span className="text-[10px] bg-muted px-1.5 rounded-full font-bold">{product.unit || 'unidad'}</span>
+                          <span className="text-[10px] bg-muted px-1.5 rounded-full font-bold uppercase">{product.unit || 'u.'}</span>
                         </div>
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline" className="text-[10px] uppercase font-bold">{product.category || "General"}</Badge>
+                      <Badge variant="outline" className="text-[9px] uppercase font-black text-muted-foreground tracking-tighter">{product.category || "General"}</Badge>
                     </TableCell>
                     <TableCell className="text-right font-black text-primary">
-                      {product.isVariablePrice ? <span className="text-accent text-[10px] font-black">VARIABLE</span> : `$${(product.price || 0).toLocaleString()}`}
+                      {product.isVariablePrice ? <span className="text-accent text-[10px] font-black uppercase">Variable</span> : `$${(product.price || 0).toLocaleString()}`}
                     </TableCell>
                     <TableCell className="text-right">
                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
@@ -420,10 +417,10 @@ export default function InventoryPage() {
                     </TableCell>
                   </TableRow>
                 ))}
-                {filteredProducts.length === 0 && (
+                {!isProductsLoading && filteredProducts.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center py-24 text-muted-foreground italic">
-                      No se encontraron productos en el inventario.
+                      No se encontraron productos en la base de datos.
                     </TableCell>
                   </TableRow>
                 )}
@@ -441,26 +438,25 @@ function ProductFormFields({ product, categories, selectedCategory, setSelectedC
     <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto px-1">
       <div className="grid gap-2">
         <label className="text-sm font-bold">Nombre del Producto *</label>
-        <Input name="name" defaultValue={product?.name} placeholder="Ej: Coca Cola 1.5L" required />
+        <Input name="name" defaultValue={product?.name} placeholder="Ej: Tomate Perita" required />
       </div>
       
       <div className="grid gap-2">
         <label className="text-sm font-bold flex items-center gap-2">
           <ImageIcon className="h-4 w-4 text-muted-foreground" />
-          URL de la Imagen
+          URL de la Imagen (Opcional)
         </label>
-        <Input name="imageUrl" defaultValue={product?.imageUrl} placeholder="https://ejemplo.com/imagen.jpg" />
-        <p className="text-[10px] text-muted-foreground">Opcional. Se generará una imagen automática si se deja vacío.</p>
+        <Input name="imageUrl" defaultValue={product?.imageUrl} placeholder="https://..." />
       </div>
 
       <div className="flex items-center space-x-2 bg-primary/5 p-4 rounded-xl border-2 border-dashed border-primary/20">
         <Switch id="variable-price" checked={isVariablePrice} onCheckedChange={setIsVariablePrice} />
-        <Label htmlFor="variable-price" className="text-sm font-black text-primary uppercase tracking-tight">Venta por Peso / Precio Variable</Label>
+        <Label htmlFor="variable-price" className="text-sm font-black text-primary uppercase tracking-tight cursor-pointer">Venta por Peso / Precio Variable</Label>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
         <div className="grid gap-2">
-          <label className="text-sm font-bold">{isVariablePrice ? "Precio Referencial" : "Precio Venta *"}</label>
+          <label className="text-sm font-bold">{isVariablePrice ? "Precio Sugerido" : "Precio de Venta *"}</label>
           <Input name="price" type="number" step="0.01" defaultValue={product?.price} placeholder="0.00" required />
         </div>
         <div className="grid gap-2">
@@ -471,13 +467,13 @@ function ProductFormFields({ product, categories, selectedCategory, setSelectedC
 
       <div className="grid grid-cols-2 gap-4">
         <div className="grid gap-2">
-          <label className="text-sm font-bold">Unidad de Medida</label>
+          <label className="text-sm font-bold">Unidad</label>
           <Select name="unit" defaultValue={product?.unit || "unidad"}>
-            <SelectTrigger><SelectValue placeholder="Elegir..." /></SelectTrigger>
+            <SelectTrigger><SelectValue placeholder="Unidad..." /></SelectTrigger>
             <SelectContent>
               <SelectItem value="unidad">Unidad (u.)</SelectItem>
               <SelectItem value="kg">Kilogramos (kg)</SelectItem>
-              <SelectItem value="pack">Pack</SelectItem>
+              <SelectItem value="pack">Pack / Pack</SelectItem>
               <SelectItem value="litro">Litros (L)</SelectItem>
             </SelectContent>
           </Select>
@@ -485,7 +481,7 @@ function ProductFormFields({ product, categories, selectedCategory, setSelectedC
         <div className="grid gap-2">
           <label className="text-sm font-bold">Categoría</label>
           <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-            <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
+            <SelectTrigger><SelectValue placeholder="Rubro..." /></SelectTrigger>
             <SelectContent>
               {categories.map((cat: any) => <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>)}
             </SelectContent>
