@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useMemo } from "react";
@@ -187,6 +188,15 @@ export default function POSPage() {
       return;
     }
 
+    if (paymentMethod === "Cuenta Corriente" && !selectedCustomerId) {
+      toast({
+        variant: "destructive",
+        title: "Cliente no seleccionado",
+        description: "Debes elegir un cliente para registrar una venta a cuenta corriente."
+      });
+      return;
+    }
+
     const saleData = {
       totalAmount: total,
       paymentMethod: paymentMethod === "Tarjeta" ? `Tarjeta ${cardType}` : paymentMethod,
@@ -212,14 +222,28 @@ export default function POSPage() {
             subtotal: (item.product.price || 0) * item.quantity,
           });
 
+          // Reducir stock si no es un producto personalizado
           if (!item.product.isCustom) {
             const productDocRef = doc(firestore, "users", user.uid, "products", item.product.id);
-            const currentStock = item.product.stockQuantity || 0;
-            updateDocumentNonBlocking(productDocRef, {
-              stockQuantity: Math.max(0, currentStock - item.quantity)
-            });
+            const currentProduct = products.find(p => p.id === item.product.id);
+            if (currentProduct) {
+               updateDocumentNonBlocking(productDocRef, {
+                stockQuantity: Math.max(0, (currentProduct.stockQuantity || 0) - item.quantity)
+              });
+            }
           }
         });
+
+        // ACTUALIZACIÓN DE SALDO DEL CLIENTE (FIADO)
+        if (paymentMethod === "Cuenta Corriente" && selectedCustomerId) {
+          const customer = customers.find(c => c.id === selectedCustomerId);
+          if (customer) {
+            const customerDocRef = doc(firestore, "users", user.uid, "customers", selectedCustomerId);
+            updateDocumentNonBlocking(customerDocRef, {
+              currentBalance: (customer.currentBalance || 0) + total
+            });
+          }
+        }
       }
     });
 
@@ -460,12 +484,13 @@ export default function POSPage() {
                           ))}
                         </SelectContent>
                       </Select>
+                      <p className="text-[10px] text-muted-foreground mt-1">El monto de la venta se sumará a la deuda del cliente.</p>
                     </div>
                   )}
                 </div>
                 <DialogFooter className="sm:justify-between gap-3 mt-2">
                   <Button variant="outline" onClick={() => setIsPaymentDialogOpen(false)} className="flex-1 h-11">Cancelar</Button>
-                  <Button className="flex-1 h-11 text-base font-bold gap-2" disabled={!paymentMethod} onClick={handleCompleteSale}>
+                  <Button className="flex-1 h-11 text-base font-bold gap-2" disabled={!paymentMethod || (paymentMethod === "Cuenta Corriente" && !selectedCustomerId)} onClick={handleCompleteSale}>
                     Confirmar
                   </Button>
                 </DialogFooter>
