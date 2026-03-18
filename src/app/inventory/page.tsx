@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useRef, useMemo } from "react";
@@ -46,7 +47,8 @@ import {
   Edit3, 
   FileUp,
   ImageIcon,
-  AlertTriangle
+  AlertTriangle,
+  Smoking
 } from "lucide-react";
 import { 
   useFirestore, 
@@ -74,6 +76,7 @@ export default function InventoryPage() {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>("");
+  const [selectedVariant, setSelectedVariant] = useState<string>("");
   const [isVariablePrice, setIsVariablePrice] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [isDeletingAll, setIsDeletingAll] = useState(false);
@@ -120,6 +123,7 @@ export default function InventoryPage() {
       stockQuantity: stock,
       unit,
       category: selectedCategory || "Sin Categoría",
+      variant: selectedCategory === "Cigarrillos" ? selectedVariant : "",
       provider: formData.get("provider") as string || "",
       sku: formData.get("sku") as string || (editingProduct ? editingProduct.sku : `SKU-${Date.now()}`),
       imageUrl,
@@ -142,6 +146,7 @@ export default function InventoryPage() {
     }
     
     setSelectedCategory("");
+    setSelectedVariant("");
     setIsVariablePrice(false);
   };
 
@@ -295,7 +300,7 @@ export default function InventoryPage() {
               Importar Excel
             </Button>
 
-            <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
+            <Dialog open={isAddOpen} onOpenChange={(open) => { setIsAddOpen(open); if(!open) { setSelectedCategory(""); setSelectedVariant(""); setIsVariablePrice(false); } }}>
               <DialogTrigger asChild>
                 <Button className="gap-2 bg-accent text-accent-foreground hover:bg-accent/90 shadow-md">
                   <Plus className="h-4 w-4" />
@@ -311,6 +316,8 @@ export default function InventoryPage() {
                     categories={categories} 
                     selectedCategory={selectedCategory} 
                     setSelectedCategory={setSelectedCategory} 
+                    selectedVariant={selectedVariant}
+                    setSelectedVariant={setSelectedVariant}
                     isVariablePrice={isVariablePrice}
                     setIsVariablePrice={setIsVariablePrice}
                   />
@@ -321,7 +328,7 @@ export default function InventoryPage() {
               </DialogContent>
             </Dialog>
 
-            <Dialog open={!!editingProduct} onOpenChange={(open) => !open && setEditingProduct(null)}>
+            <Dialog open={!!editingProduct} onOpenChange={(open) => { if(!open) { setEditingProduct(null); setSelectedCategory(""); setSelectedVariant(""); setIsVariablePrice(false); } }}>
               <DialogContent className="sm:max-w-[450px]">
                 {editingProduct && (
                   <form onSubmit={handleSaveProduct}>
@@ -333,6 +340,8 @@ export default function InventoryPage() {
                       categories={categories} 
                       selectedCategory={selectedCategory || editingProduct.category} 
                       setSelectedCategory={setSelectedCategory} 
+                      selectedVariant={selectedVariant || editingProduct.variant}
+                      setSelectedVariant={setSelectedVariant}
                       isVariablePrice={isVariablePrice}
                       setIsVariablePrice={setIsVariablePrice}
                     />
@@ -385,7 +394,12 @@ export default function InventoryPage() {
                     </TableCell>
                     <TableCell className="font-medium">
                       <div className="flex flex-col">
-                        <span className="font-bold text-sm">{product.name}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-sm">{product.name}</span>
+                          {product.variant && (
+                            <Badge variant="secondary" className="text-[9px] font-black h-4 px-1">{product.variant}</Badge>
+                          )}
+                        </div>
                         <div className="flex gap-2 items-center">
                           <span className="text-[10px] text-muted-foreground font-mono">{product.sku}</span>
                           <span className="text-[10px] bg-muted px-1.5 rounded-full font-bold uppercase">{product.unit || 'u.'}</span>
@@ -407,7 +421,7 @@ export default function InventoryPage() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditingProduct(product); setSelectedCategory(product.category); setIsVariablePrice(!!product.isVariablePrice); }}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditingProduct(product); setSelectedCategory(product.category); setSelectedVariant(product.variant || ""); setIsVariablePrice(!!product.isVariablePrice); }}>
                           <Edit3 className="h-4 w-4" />
                         </Button>
                         <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={() => handleDelete(product.id)}>
@@ -433,12 +447,12 @@ export default function InventoryPage() {
   );
 }
 
-function ProductFormFields({ product, categories, selectedCategory, setSelectedCategory, isVariablePrice, setIsVariablePrice }: any) {
+function ProductFormFields({ product, categories, selectedCategory, setSelectedCategory, selectedVariant, setSelectedVariant, isVariablePrice, setIsVariablePrice }: any) {
   return (
     <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto px-1">
       <div className="grid gap-2">
         <label className="text-sm font-bold">Nombre del Producto *</label>
-        <Input name="name" defaultValue={product?.name} placeholder="Ej: Tomate Perita" required />
+        <Input name="name" defaultValue={product?.name} placeholder="Ej: Marlboro" required />
       </div>
       
       <div className="grid gap-2">
@@ -447,6 +461,35 @@ function ProductFormFields({ product, categories, selectedCategory, setSelectedC
           URL de la Imagen (Opcional)
         </label>
         <Input name="imageUrl" defaultValue={product?.imageUrl} placeholder="https://..." />
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="grid gap-2">
+          <label className="text-sm font-bold">Categoría</label>
+          <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+            <SelectTrigger><SelectValue placeholder="Rubro..." /></SelectTrigger>
+            <SelectContent>
+              {categories.map((cat: any) => <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+        {selectedCategory === "Cigarrillos" && (
+          <div className="grid gap-2 animate-in fade-in slide-in-from-top-2">
+            <label className="text-sm font-bold flex items-center gap-1">
+              <Smoking className="h-3 w-3" />
+              Tipo de Pack
+            </label>
+            <Select value={selectedVariant} onValueChange={setSelectedVariant}>
+              <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="BOX 20">BOX 20</SelectItem>
+                <SelectItem value="BOX 10">BOX 10</SelectItem>
+                <SelectItem value="COMUN 20">COMUN 20</SelectItem>
+                <SelectItem value="COMUN 10">COMUN 10</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
       </div>
 
       <div className="flex items-center space-x-2 bg-primary/5 p-4 rounded-xl border-2 border-dashed border-primary/20">
@@ -479,25 +522,14 @@ function ProductFormFields({ product, categories, selectedCategory, setSelectedC
           </Select>
         </div>
         <div className="grid gap-2">
-          <label className="text-sm font-bold">Categoría</label>
-          <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-            <SelectTrigger><SelectValue placeholder="Rubro..." /></SelectTrigger>
-            <SelectContent>
-              {categories.map((cat: any) => <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div className="grid gap-2">
           <label className="text-sm font-bold">SKU / Código</label>
           <Input name="sku" defaultValue={product?.sku} placeholder="Escanear..." />
         </div>
-        <div className="grid gap-2">
-          <label className="text-sm font-bold">Proveedor</label>
-          <Input name="provider" defaultValue={product?.provider} placeholder="Nombre..." />
-        </div>
+      </div>
+
+      <div className="grid gap-2">
+        <label className="text-sm font-bold">Proveedor</label>
+        <Input name="provider" defaultValue={product?.provider} placeholder="Nombre..." />
       </div>
     </div>
   );

@@ -36,6 +36,8 @@
         "stockQuantity": { "type": "number" },
         "unit": { "type": "string", "description": "Unidad de medida (ej: kg, unidad, pack)" },
         "categoryId": { "type": "string" },
+        "category": { "type": "string" },
+        "variant": { "type": "string", "description": "Variante específica (ej: BOX 20 para cigarrillos)" },
         "imageUrl": { "type": "string", "description": "URL of the product image" },
         "isVariablePrice": { "type": "boolean", "description": "If true, POS will prompt for price" }
       },

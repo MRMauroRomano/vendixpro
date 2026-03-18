@@ -109,7 +109,8 @@ export default function POSPage() {
     const term = searchTerm.toLowerCase();
     return products.filter(p => 
       String(p.name || "").toLowerCase().includes(term) ||
-      String(p.sku || "").toLowerCase().includes(term)
+      String(p.sku || "").toLowerCase().includes(term) ||
+      String(p.variant || "").toLowerCase().includes(term)
     );
   }, [products, searchTerm]);
 
@@ -231,7 +232,7 @@ export default function POSPage() {
           addDocumentNonBlocking(saleItemsRef, {
             saleId: saleRef.id,
             productId: item.product.id,
-            productName: item.product.name,
+            productName: item.product.variant ? `${item.product.name} (${item.product.variant})` : item.product.name,
             quantity: item.quantity,
             unitPrice: item.product.price || 0,
             subtotal: (item.product.price || 0) * item.quantity,
@@ -303,7 +304,7 @@ export default function POSPage() {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input 
-                placeholder="Buscar productos (nombre o SKU)..." 
+                placeholder="Buscar productos (nombre, SKU o variante)..." 
                 className="pl-10 h-12 text-base shadow-sm bg-white"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -371,6 +372,11 @@ export default function POSPage() {
                     <Badge className={`shadow-md font-bold ${(product.stockQuantity || 0) <= 5 ? 'bg-red-500' : 'bg-primary'}`}>
                       {product.stockQuantity || 0} u.
                     </Badge>
+                    {product.variant && (
+                      <Badge variant="secondary" className="bg-accent text-accent-foreground font-black text-[9px] uppercase h-5 px-1.5 shadow-sm">
+                        {product.variant}
+                      </Badge>
+                    )}
                     {product.isVariablePrice && (
                       <Badge variant="secondary" className="bg-white/90 text-accent font-black gap-1">
                         <Scale className="h-3 w-3" />
@@ -427,7 +433,10 @@ export default function POSPage() {
                        <img src={item.product.imageUrl || `https://picsum.photos/seed/${item.product.id}/100/100`} alt="" className="h-full w-full object-cover" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="font-bold text-xs truncate">{item.product.name}</div>
+                      <div className="font-bold text-xs truncate">
+                        {item.product.name}
+                        {item.product.variant && <span className="ml-1 text-[9px] opacity-60">({item.product.variant})</span>}
+                      </div>
                       <div className="text-[10px] text-muted-foreground">${(item.product.price || 0).toLocaleString()} c/u</div>
                     </div>
                     <div className="flex flex-col items-end gap-1">
