@@ -19,7 +19,8 @@ import {
   ChevronRight,
   StickyNote,
   Scale,
-  Loader2
+  Loader2,
+  Lock
 } from "lucide-react";
 import { 
   Dialog, 
@@ -45,8 +46,9 @@ import {
   addDocumentNonBlocking,
   updateDocumentNonBlocking
 } from "@/firebase";
-import { collection, doc } from "firebase/firestore";
+import { collection, doc, query, where, limit } from "firebase/firestore";
 import { Badge } from "@/components/ui/badge";
+import Link from "next/link";
 
 interface CartItem {
   product: any;
@@ -73,6 +75,19 @@ export default function POSPage() {
   const [cashReceived, setCashReceived] = useState<number>(0);
   const [cardType, setCardType] = useState<string>("");
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
+
+  // VALIDACIÓN DE CAJA ABIERTA
+  const activeSessionQuery = useMemoFirebase(() => {
+    if (!firestore || !user?.uid) return null;
+    return query(
+      collection(firestore, "users", user.uid, "cash_sessions"),
+      where("status", "==", "open"),
+      limit(1)
+    );
+  }, [firestore, user?.uid]);
+
+  const { data: activeSessions, isLoading: isSessionLoading } = useCollection(activeSessionQuery);
+  const isCashOpen = activeSessions && activeSessions.length > 0;
 
   const productsRef = useMemoFirebase(() => {
     if (!firestore || !user?.uid) return null;
@@ -222,7 +237,6 @@ export default function POSPage() {
             subtotal: (item.product.price || 0) * item.quantity,
           });
 
-          // Reducir stock si no es un producto personalizado
           if (!item.product.isCustom) {
             const productDocRef = doc(firestore, "users", user.uid, "products", item.product.id);
             const currentProduct = products.find(p => p.id === item.product.id);
@@ -234,7 +248,6 @@ export default function POSPage() {
           }
         });
 
-        // ACTUALIZACIÓN DE SALDO DEL CLIENTE (FIADO)
         if (paymentMethod === "Cuenta Corriente" && selectedCustomerId) {
           const customer = customers.find(c => c.id === selectedCustomerId);
           if (customer) {
@@ -252,6 +265,35 @@ export default function POSPage() {
     setIsPaymentDialogOpen(false);
     resetPayment();
   };
+
+  if (isSessionLoading) {
+    return (
+      <AppLayout>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </AppLayout>
+    );
+  }
+
+  if (!isCashOpen) {
+    return (
+      <AppLayout>
+        <div className="flex flex-col items-center justify-center min-h-[70vh] space-y-6 text-center max-w-lg mx-auto">
+          <div className="bg-red-100 p-6 rounded-full">
+            <Lock className="h-16 w-16 text-red-600" />
+          </div>
+          <h1 className="text-3xl font-black text-primary uppercase tracking-tight">Caja Cerrada</h1>
+          <p className="text-muted-foreground">
+            Para realizar ventas, primero debes iniciar un turno en el sistema. Esto asegura que el arqueo de dinero sea correcto.
+          </p>
+          <Button asChild size="lg" className="font-bold h-14 px-8">
+            <Link href="/cash">Abrir Caja Ahora</Link>
+          </Button>
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>

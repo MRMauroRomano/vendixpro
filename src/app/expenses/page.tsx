@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useMemo } from "react";
@@ -21,7 +22,7 @@ import {
   DialogTrigger,
   DialogFooter
 } from "@/components/ui/dialog";
-import { Plus, Filter, Calendar, Download, Loader2, Receipt, Trash2 } from "lucide-react";
+import { Plus, Filter, Calendar, Download, Loader2, Receipt, Trash2, Lock } from "lucide-react";
 import { 
   useFirestore, 
   useUser, 
@@ -30,16 +31,30 @@ import {
   addDocumentNonBlocking, 
   deleteDocumentNonBlocking 
 } from "@/firebase";
-import { collection, doc, query, orderBy } from "firebase/firestore";
+import { collection, doc, query, orderBy, where, limit } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { format, startOfMonth, isWithinInterval, endOfMonth } from "date-fns";
 import { es } from "date-fns/locale";
+import Link from "next/link";
 
 export default function ExpensesPage() {
   const firestore = useFirestore();
   const { user } = useUser();
   const { toast } = useToast();
   const [isAddOpen, setIsAddOpen] = useState(false);
+
+  // VALIDACIÓN DE CAJA ABIERTA
+  const activeSessionQuery = useMemoFirebase(() => {
+    if (!firestore || !user?.uid) return null;
+    return query(
+      collection(firestore, "users", user.uid, "cash_sessions"),
+      where("status", "==", "open"),
+      limit(1)
+    );
+  }, [firestore, user?.uid]);
+
+  const { data: activeSessions, isLoading: isSessionLoading } = useCollection(activeSessionQuery);
+  const isCashOpen = activeSessions && activeSessions.length > 0;
 
   const expensesRef = useMemoFirebase(() => {
     if (!firestore || !user?.uid) return null;
@@ -61,7 +76,6 @@ export default function ExpensesPage() {
 
     const totalMonthly = monthlyExpenses.reduce((acc, exp) => acc + (exp.amount || 0), 0);
     
-    // Calcular categoría con más gasto
     const catMap: Record<string, number> = {};
     monthlyExpenses.forEach(exp => {
       const cat = exp.category || "General";
@@ -116,6 +130,35 @@ export default function ExpensesPage() {
     deleteDocumentNonBlocking(docRef);
     toast({ title: "Gasto Eliminado", description: "El registro ha sido borrado de la caja." });
   };
+
+  if (isSessionLoading) {
+    return (
+      <AppLayout>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </AppLayout>
+    );
+  }
+
+  if (!isCashOpen) {
+    return (
+      <AppLayout>
+        <div className="flex flex-col items-center justify-center min-h-[70vh] space-y-6 text-center max-w-lg mx-auto">
+          <div className="bg-red-100 p-6 rounded-full">
+            <Lock className="h-16 w-16 text-red-600" />
+          </div>
+          <h1 className="text-3xl font-black text-primary uppercase tracking-tight">Registro Bloqueado</h1>
+          <p className="text-muted-foreground">
+            Para registrar gastos operativos, primero debes abrir la caja. Esto permite llevar un control exacto de las salidas de dinero durante el turno.
+          </p>
+          <Button asChild size="lg" className="font-bold h-14 px-8">
+            <Link href="/cash">Abrir Caja Ahora</Link>
+          </Button>
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>
