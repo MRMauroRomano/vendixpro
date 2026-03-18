@@ -23,15 +23,12 @@ import {
 } from "@/components/ui/dialog";
 import { 
   Search, 
-  Plus, 
   UserCircle, 
   Phone, 
   DollarSign, 
-  ArrowRight, 
   Loader2, 
   Trash2, 
-  UserPlus,
-  AlertCircle
+  UserPlus
 } from "lucide-react";
 import { 
   useFirestore, 
@@ -41,7 +38,7 @@ import {
   addDocumentNonBlocking, 
   deleteDocumentNonBlocking 
 } from "@/firebase";
-import { collection, doc, query, orderBy } from "firebase/firestore";
+import { collection, doc, query, orderBy, CollectionReference } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 
 export default function ClientsPage() {
@@ -52,12 +49,19 @@ export default function ClientsPage() {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
-  const customersRef = useMemoFirebase(() => {
+  // Referencia base de la colección (necesaria para escrituras/addDoc)
+  const baseCustomersRef = useMemoFirebase(() => {
     if (!firestore || !user?.uid) return null;
-    return query(collection(firestore, "users", user.uid, "customers"), orderBy("name", "asc"));
+    return collection(firestore, "users", user.uid, "customers");
   }, [firestore, user?.uid]);
 
-  const { data: customersData, isLoading } = useCollection(customersRef);
+  // Consulta para lectura (ordenada)
+  const customersQuery = useMemoFirebase(() => {
+    if (!baseCustomersRef) return null;
+    return query(baseCustomersRef as CollectionReference, orderBy("name", "asc"));
+  }, [baseCustomersRef]);
+
+  const { data: customersData, isLoading } = useCollection(customersQuery);
   const customers = customersData || [];
 
   const filteredCustomers = useMemo(() => {
@@ -76,7 +80,8 @@ export default function ClientsPage() {
 
   const handleSaveCustomer = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!user || !customersRef) return;
+    // CRITICAL: Se debe usar la referencia de colección base, no la Query.
+    if (!user || !baseCustomersRef) return;
 
     const formData = new FormData(e.currentTarget);
     const name = formData.get("name") as string;
@@ -90,11 +95,13 @@ export default function ClientsPage() {
       createdAt: new Date().toISOString()
     };
 
-    addDocumentNonBlocking(customersRef as any, newCustomer);
+    addDocumentNonBlocking(baseCustomersRef as CollectionReference, newCustomer);
+    
     toast({ 
       title: "Cliente Registrado", 
       description: `${name} ha sido agregado a la lista.` 
     });
+    
     setIsAddOpen(false);
   };
 
