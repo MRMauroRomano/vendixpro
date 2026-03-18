@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useMemo } from "react";
@@ -5,21 +6,15 @@ import { AppLayout } from "@/components/layout/app-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from "@/components/ui/table";
+import { Separator } from "@/components/ui/separator";
 import { 
   Dialog, 
   DialogContent, 
   DialogHeader, 
   DialogTitle, 
   DialogFooter,
-  DialogTrigger
+  DialogTrigger,
+  DialogDescription
 } from "@/components/ui/dialog";
 import { 
   ArrowUpCircle, 
@@ -32,7 +27,9 @@ import {
   CreditCard,
   QrCode,
   UserCheck,
-  Banknote
+  Banknote,
+  Calculator,
+  AlertCircle
 } from "lucide-react";
 import { 
   useFirestore, 
@@ -44,8 +41,7 @@ import {
 } from "@/firebase";
 import { collection, query, orderBy, limit, doc, where } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import Link from "next/link";
 
 export default function CashControlPage() {
   const firestore = useFirestore();
@@ -62,16 +58,13 @@ export default function CashControlPage() {
     return collection(firestore, "users", user.uid, "cash_sessions");
   }, [firestore, user?.uid]);
 
-  const sessionsQuery = useMemoFirebase(() => {
+  const activeSessionQuery = useMemoFirebase(() => {
     if (!sessionsBaseRef) return null;
-    return query(sessionsBaseRef, orderBy("openedAt", "desc"), limit(20));
+    return query(sessionsBaseRef, where("status", "==", "open"), limit(1));
   }, [sessionsBaseRef]);
 
-  const { data: sessions, isLoading: sessionsLoading } = useCollection(sessionsQuery);
-  
-  const activeSession = useMemo(() => {
-    return (sessions || []).find(s => s.status === 'open');
-  }, [sessions]);
+  const { data: activeSessions, isLoading: sessionsLoading } = useCollection(activeSessionQuery);
+  const activeSession = activeSessions?.[0] || null;
 
   const salesQuery = useMemoFirebase(() => {
     if (!firestore || !user?.uid || !activeSession) return null;
@@ -167,8 +160,8 @@ export default function CashControlPage() {
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold font-headline text-primary">Control de Caja</h1>
-            <p className="text-muted-foreground">Supervise el flujo de dinero y realice arqueos de turno.</p>
+            <h1 className="text-3xl font-bold font-headline text-primary">Turno Actual</h1>
+            <p className="text-muted-foreground">Monitoreo de flujo de caja en tiempo real.</p>
           </div>
 
           {!activeSession ? (
@@ -203,49 +196,95 @@ export default function CashControlPage() {
               </DialogContent>
             </Dialog>
           ) : (
-            <Dialog open={isClosingDialogOpen} onOpenChange={setIsClosingDialogOpen}>
-              <DialogTrigger asChild>
-                <Button variant="destructive" className="gap-2 font-bold h-12 px-6 shadow-lg">
-                  <Lock className="h-5 w-5" />
-                  CERRAR CAJA
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Cierre de Turno (Arqueo)</DialogTitle>
-                </DialogHeader>
-                <div className="py-4 space-y-4">
-                  <div className="bg-primary/5 p-4 rounded-xl border-2 border-dashed border-primary/20 space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-bold text-primary">SALDO ESPERADO (EFECTIVO):</span>
-                      <span className="text-xl font-black text-primary">${stats.expected.toLocaleString()}</span>
+            <div className="flex gap-2">
+              <Button asChild variant="outline" className="gap-2 h-12">
+                <Link href="/cash/history">
+                   <History className="h-4 w-4" />
+                   Historial
+                </Link>
+              </Button>
+              <Dialog open={isClosingDialogOpen} onOpenChange={setIsClosingDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="destructive" className="gap-2 font-bold h-12 px-6 shadow-lg">
+                    <Lock className="h-5 w-5" />
+                    ARQUEO Y CIERRE
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[500px]">
+                  <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                      <Calculator className="h-5 w-5" />
+                      Arqueo de Turno
+                    </DialogTitle>
+                    <DialogDescription>
+                      Revise los totales antes de finalizar la sesión de caja.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="py-4 space-y-4">
+                    <div className="bg-muted/50 p-4 rounded-xl border space-y-3">
+                       <div className="flex justify-between text-sm">
+                         <span>Fondo Inicial (Apertura):</span>
+                         <span className="font-bold">${(activeSession.openingBalance || 0).toLocaleString()}</span>
+                       </div>
+                       <div className="flex justify-between text-sm text-accent">
+                         <span className="flex items-center gap-1"><ArrowUpCircle className="h-3 w-3" /> Ventas Efectivo (+):</span>
+                         <span className="font-bold">${stats.cashSales.toLocaleString()}</span>
+                       </div>
+                       <div className="flex justify-between text-sm text-red-500">
+                         <span className="flex items-center gap-1"><ArrowDownCircle className="h-3 w-3" /> Gastos de Caja (-):</span>
+                         <span className="font-bold">${stats.totalExpenses.toLocaleString()}</span>
+                       </div>
+                       <Separator />
+                       <div className="flex justify-between items-center py-1">
+                         <span className="text-sm font-black uppercase">Saldo Teórico (Efectivo):</span>
+                         <span className="text-2xl font-black text-primary">${stats.expected.toLocaleString()}</span>
+                       </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="text-center p-2 rounded border bg-blue-50">
+                        <p className="text-[9px] font-bold text-blue-600 uppercase">Tarjeta</p>
+                        <p className="text-sm font-black">${stats.cardSales.toLocaleString()}</p>
+                      </div>
+                      <div className="text-center p-2 rounded border bg-purple-50">
+                        <p className="text-[9px] font-bold text-purple-600 uppercase">QR/Trans</p>
+                        <p className="text-sm font-black">${stats.qrSales.toLocaleString()}</p>
+                      </div>
+                      <div className="text-center p-2 rounded border bg-orange-50">
+                        <p className="text-[9px] font-bold text-orange-600 uppercase">Fiado</p>
+                        <p className="text-sm font-black">${stats.creditSales.toLocaleString()}</p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 pt-2">
+                      <label className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                        <AlertCircle className="h-4 w-4 text-destructive" />
+                        Efectivo Real en Mano ($)
+                      </label>
+                      <Input 
+                        type="number" 
+                        placeholder="Monto contado físicamente..."
+                        className="text-2xl font-black h-14 border-destructive ring-destructive/20"
+                        value={actualCash || ""}
+                        onChange={(e) => setActualCash(Number(e.target.value))}
+                        autoFocus
+                      />
+                      <p className="text-[10px] text-muted-foreground italic">Cuente todo el efectivo del cajón y el fondo.</p>
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Efectivo Real en Caja ($)</label>
-                    <Input 
-                      type="number" 
-                      placeholder="Cuente el dinero físico..."
-                      className="text-2xl font-black h-14 border-destructive"
-                      value={actualCash || ""}
-                      onChange={(e) => setActualCash(Number(e.target.value))}
-                      autoFocus
-                    />
-                    <p className="text-[10px] text-muted-foreground">Cuente el dinero físico que hay actualmente en el cajón.</p>
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button className="w-full h-12 text-lg font-bold" variant="destructive" onClick={handleCloseCash}>Finalizar Turno</Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+                  <DialogFooter>
+                    <Button className="w-full h-12 text-lg font-bold" variant="destructive" onClick={handleCloseCash}>Finalizar Sesión</Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
           )}
         </div>
 
         {activeSession ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <Card className="bg-primary text-primary-foreground border-none shadow-xl col-span-1 md:col-span-2 lg:col-span-1">
-              <CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase tracking-widest opacity-70 flex items-center gap-2"><Banknote className="h-3 w-3" /> Saldo Esperado (Caja)</CardTitle></CardHeader>
+              <CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase tracking-widest opacity-70 flex items-center gap-2"><Banknote className="h-3 w-3" /> Saldo Teórico (Caja)</CardTitle></CardHeader>
               <CardContent><div className="text-4xl font-black">${stats.expected.toLocaleString()}</div></CardContent>
             </Card>
             
@@ -288,60 +327,6 @@ export default function CashControlPage() {
             </CardContent>
           </Card>
         )}
-
-        <Card className="border-2">
-          <CardHeader className="border-b bg-muted/10">
-            <CardTitle className="text-lg font-bold flex items-center gap-2">
-              <History className="h-5 w-5 text-primary" /> 
-              Historial de Arqueos Recientes
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            {sessionsLoading ? (
-              <div className="p-12 flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
-            ) : sessions && sessions.length > 0 ? (
-              <Table>
-                <TableHeader className="bg-muted/50">
-                  <TableRow>
-                    <TableHead className="font-bold">Apertura / Cierre</TableHead>
-                    <TableHead className="font-bold">Estado</TableHead>
-                    <TableHead className="text-right font-bold">Esperado</TableHead>
-                    <TableHead className="text-right font-bold">Real (Físico)</TableHead>
-                    <TableHead className="text-right font-bold">Diferencia</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {sessions.map((s) => (
-                    <TableRow key={s.id} className="hover:bg-muted/10 transition-colors">
-                      <TableCell className="text-xs">
-                        <div className="flex flex-col">
-                          <span className="font-bold text-primary">Inició: {format(new Date(s.openedAt), "dd/MM HH:mm", { locale: es })}</span>
-                          {s.closedAt && <span className="text-muted-foreground">Cerró: {format(new Date(s.closedAt), "dd/MM HH:mm", { locale: es })}</span>}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <span className={`text-[10px] font-black px-2.5 py-1 rounded-full border ${s.status === 'open' ? 'bg-accent/10 text-accent border-accent/20' : 'bg-muted text-muted-foreground border-border'}`}>
-                          {s.status === 'open' ? 'TURNO ACTIVO' : 'CONCLUIDO'}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-right font-medium">${(s.expectedClosingBalance || 0).toLocaleString()}</TableCell>
-                      <TableCell className="text-right font-bold">${(s.actualClosingBalance || 0).toLocaleString()}</TableCell>
-                      <TableCell className={`text-right font-black ${s.difference < 0 ? 'text-red-500' : s.difference > 0 ? 'text-accent' : 'text-primary'}`}>
-                        ${(s.difference || 0).toLocaleString()}
-                        {s.difference !== 0 && (s.difference < 0 ? ' (Faltante)' : ' (Sobrante)')}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            ) : (
-              <div className="p-24 text-center text-muted-foreground italic flex flex-col items-center gap-3">
-                <CalendarDays className="h-12 w-12 opacity-10" /> 
-                <p>No se registran arqueos en la base de datos.</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
       </div>
     </AppLayout>
   );

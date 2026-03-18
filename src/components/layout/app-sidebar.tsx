@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -18,7 +19,9 @@ import {
   AlertTriangle,
   Tags,
   Layers,
-  TableProperties
+  TableProperties,
+  Unlock,
+  Lock
 } from "lucide-react";
 import {
   Sidebar,
@@ -57,7 +60,15 @@ const navItems = [
     ]
   },
   { icon: History, label: "Historial de Ventas", href: "/sales" },
-  { icon: Wallet, label: "Control de Caja", href: "/cash" },
+  { 
+    icon: Wallet, 
+    label: "Control de Caja", 
+    href: "/cash",
+    items: [
+      { label: "Turno Actual", href: "/cash", icon: Unlock },
+      { label: "Historial de Cierres", href: "/cash/history", icon: History },
+    ]
+  },
   { icon: Receipt, label: "Gastos", href: "/expenses" },
   { icon: Users, label: "Clientes / Cuentas", href: "/clients" },
 ];
