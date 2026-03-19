@@ -30,8 +30,24 @@ import {
   addDocumentNonBlocking,
   updateDocumentNonBlocking
 } from "@/firebase";
-import { collection, doc, query, where, limit } from "firebase/firestore";
+import { collection, doc, query, where, limit, addDoc } from "firebase/firestore";
 import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogFooter,
+  DialogTrigger
+} from "@/components/ui/dialog";
 import Link from "next/link";
 
 interface CartItem {
