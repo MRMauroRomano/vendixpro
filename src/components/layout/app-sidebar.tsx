@@ -21,7 +21,8 @@ import {
   Layers,
   TableProperties,
   Unlock,
-  Lock
+  Lock,
+  GlassWater
 } from "lucide-react";
 import {
   Sidebar,
@@ -47,7 +48,15 @@ import { useToast } from "@/hooks/use-toast";
 
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/" },
-  { icon: ShoppingCart, label: "Punto de Venta", href: "/pos" },
+  { 
+    icon: ShoppingCart, 
+    label: "Punto de Venta", 
+    href: "/pos",
+    items: [
+      { label: "Venta General", href: "/pos", icon: ShoppingBag },
+      { label: "Promos Bebidas", href: "/pos?category=Promos", icon: GlassWater },
+    ]
+  },
   { 
     icon: Package, 
     label: "Inventario", 
@@ -110,7 +119,11 @@ export function AppSidebar() {
         <SidebarMenu>
           {navItems.map((item) => {
             const hasSubItems = item.items && item.items.length > 0;
-            const isActive = pathname === item.href || item.items?.some(sub => pathname === sub.href);
+            // Check if current path matches item.href OR any of its subitems
+            const isActive = pathname === item.href || item.items?.some(sub => {
+              const [path] = sub.href.split('?');
+              return pathname === path;
+            });
 
             if (hasSubItems) {
               return (
@@ -132,7 +145,7 @@ export function AppSidebar() {
                       <SidebarMenuSub>
                         {item.items?.map((subItem) => (
                           <SidebarMenuSubItem key={subItem.href}>
-                            <SidebarMenuSubButton asChild isActive={pathname === subItem.href}>
+                            <SidebarMenuSubButton asChild isActive={pathname === subItem.href.split('?')[0]}>
                               <Link href={subItem.href} className="flex items-center gap-2">
                                 <subItem.icon className="h-4 w-4 opacity-70" />
                                 <span>{subItem.label}</span>

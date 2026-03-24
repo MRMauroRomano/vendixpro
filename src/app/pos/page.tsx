@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { AppLayout } from "@/components/layout/app-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,7 +21,9 @@ import {
   Scale,
   Loader2,
   Lock,
-  Filter
+  Filter,
+  GlassWater,
+  Star
 } from "lucide-react";
 import { 
   useCollection, 
@@ -34,6 +36,7 @@ import {
 import { collection, doc, query, where, limit, addDoc } from "firebase/firestore";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { useSearchParams } from "next/navigation";
 import {
   Select,
   SelectContent,
@@ -61,6 +64,7 @@ export default function POSPage() {
   const firestore = useFirestore();
   const { user } = useUser();
   const { toast } = useToast();
+  const searchParams = useSearchParams();
 
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -78,6 +82,14 @@ export default function POSPage() {
   const [cashReceived, setCashReceived] = useState<number>(0);
   const [cardType, setCardType] = useState<string>("");
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
+
+  // Manejar el filtro de categoría desde la URL
+  useEffect(() => {
+    const cat = searchParams.get("category");
+    if (cat) {
+      setSelectedCategoryFilter(cat);
+    }
+  }, [searchParams]);
 
   // VALIDACIÓN DE CAJA ABIERTA
   const activeSessionQuery = useMemoFirebase(() => {
@@ -373,17 +385,27 @@ export default function POSPage() {
                 <Button
                   variant={selectedCategoryFilter === null ? "default" : "outline"}
                   size="sm"
-                  className="rounded-full font-bold uppercase text-[10px] tracking-wider"
+                  className="rounded-full font-bold uppercase text-[10px] tracking-wider h-9"
                   onClick={() => setSelectedCategoryFilter(null)}
                 >
                   Todas
                 </Button>
-                {categories.map((cat) => (
+                <Button
+                  variant={selectedCategoryFilter === "Promos" ? "default" : "outline"}
+                  size="sm"
+                  className="rounded-full font-bold uppercase text-[10px] tracking-wider h-9 gap-1.5 border-accent text-accent data-[state=active]:bg-accent data-[state=active]:text-accent-foreground"
+                  onClick={() => setSelectedCategoryFilter("Promos")}
+                  data-state={selectedCategoryFilter === "Promos" ? "active" : "inactive"}
+                >
+                  <GlassWater className="h-3 w-3" />
+                  Promos
+                </Button>
+                {categories.filter(c => c.name !== "Promos").map((cat) => (
                   <Button
                     key={cat.id}
                     variant={selectedCategoryFilter === cat.name ? "default" : "outline"}
                     size="sm"
-                    className="rounded-full font-bold uppercase text-[10px] tracking-wider"
+                    className="rounded-full font-bold uppercase text-[10px] tracking-wider h-9"
                     onClick={() => setSelectedCategoryFilter(cat.name)}
                   >
                     {cat.name}
@@ -402,7 +424,7 @@ export default function POSPage() {
             ) : filteredProducts.map(product => (
               <Card 
                 key={product.id} 
-                className={`cursor-pointer hover:shadow-xl transition-all border-2 group overflow-hidden bg-card flex flex-col h-fit min-h-[280px] ${product.isVariablePrice ? 'border-dashed border-accent/40' : ''}`}
+                className={`cursor-pointer hover:shadow-xl transition-all border-2 group overflow-hidden bg-card flex flex-col h-fit min-h-[280px] ${product.isVariablePrice ? 'border-dashed border-accent/40' : ''} ${product.category === 'Promos' ? 'border-accent/40 shadow-sm' : ''}`}
                 onClick={() => addToCart(product)}
               >
                 <div className="relative aspect-video w-full overflow-hidden bg-muted border-b shrink-0">
@@ -418,6 +440,12 @@ export default function POSPage() {
                     {product.variant && (
                       <Badge variant="secondary" className="bg-accent text-accent-foreground font-black text-[9px] uppercase h-5 px-1.5 shadow-sm">
                         {product.variant}
+                      </Badge>
+                    )}
+                    {product.category === 'Promos' && (
+                      <Badge className="bg-accent text-accent-foreground font-black gap-1 shadow-md">
+                        <Star className="h-3 w-3 fill-current" />
+                        PROMO
                       </Badge>
                     )}
                     {product.isVariablePrice && (
