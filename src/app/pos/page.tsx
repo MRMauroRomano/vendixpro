@@ -83,7 +83,6 @@ export default function POSPage() {
   const [cardType, setCardType] = useState<string>("");
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
 
-  // Manejar el filtro de categoría desde la URL
   useEffect(() => {
     const cat = searchParams.get("category");
     if (cat) {
@@ -91,7 +90,6 @@ export default function POSPage() {
     }
   }, [searchParams]);
 
-  // VALIDACIÓN DE CAJA ABIERTA
   const activeSessionQuery = useMemoFirebase(() => {
     if (!firestore || !user?.uid) return null;
     return query(
