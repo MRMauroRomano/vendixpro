@@ -20,7 +20,8 @@ import {
   StickyNote,
   Scale,
   Loader2,
-  Lock
+  Lock,
+  Filter
 } from "lucide-react";
 import { 
   useCollection, 
@@ -48,6 +49,7 @@ import {
   DialogFooter,
   DialogTrigger
 } from "@/components/ui/dialog";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import Link from "next/link";
 
 interface CartItem {
@@ -62,6 +64,7 @@ export default function POSPage() {
 
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string | null>(null);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   const [isCustomItemDialogOpen, setIsCustomItemDialogOpen] = useState(false);
   
@@ -94,25 +97,36 @@ export default function POSPage() {
     return collection(firestore, "users", user.uid, "products");
   }, [firestore, user?.uid]);
 
+  const categoriesRef = useMemoFirebase(() => {
+    if (!firestore || !user?.uid) return null;
+    return collection(firestore, "users", user.uid, "categories");
+  }, [firestore, user?.uid]);
+
   const customersRef = useMemoFirebase(() => {
     if (!firestore || !user?.uid) return null;
     return collection(firestore, "users", user.uid, "customers");
   }, [firestore, user?.uid]);
   
   const { data: productsData, isLoading: isProductsLoading } = useCollection(productsRef);
+  const { data: categoriesData } = useCollection(categoriesRef);
   const { data: customersData } = useCollection(customersRef);
 
   const products = productsData || [];
+  const categories = categoriesData || [];
   const customers = customersData || [];
 
   const filteredProducts = useMemo(() => {
     const term = searchTerm.toLowerCase();
-    return products.filter(p => 
-      String(p.name || "").toLowerCase().includes(term) ||
-      String(p.sku || "").toLowerCase().includes(term) ||
-      String(p.variant || "").toLowerCase().includes(term)
-    );
-  }, [products, searchTerm]);
+    return products.filter(p => {
+      const matchesSearch = String(p.name || "").toLowerCase().includes(term) ||
+                          String(p.sku || "").toLowerCase().includes(term) ||
+                          String(p.variant || "").toLowerCase().includes(term);
+      
+      const matchesCategory = !selectedCategoryFilter || p.category === selectedCategoryFilter;
+      
+      return matchesSearch && matchesCategory;
+    });
+  }, [products, searchTerm, selectedCategoryFilter]);
 
   const addToCart = (product: any, overridePrice?: number) => {
     if (product.isVariablePrice && overridePrice === undefined) {
@@ -192,7 +206,7 @@ export default function POSPage() {
     setSelectedCustomerId("");
   };
 
-  const handleCompleteSale = () => {
+  const handleCompleteSale = async () => {
     if (!user?.uid || !firestore || cart.length === 0 || !paymentMethod) return;
     
     if (paymentMethod === "Efectivo" && cashReceived < total) {
@@ -224,47 +238,49 @@ export default function POSPage() {
 
     const salesRef = collection(firestore, "users", user.uid, "sales");
     
-    addDoc(salesRef, saleData).then((saleRef) => {
-      if (saleRef) {
-        const saleItemsRef = collection(firestore, "users", user.uid, "sales", saleRef.id, "sale_items");
-        
-        cart.forEach(item => {
-          addDocumentNonBlocking(saleItemsRef, {
-            saleId: saleRef.id,
-            productId: item.product.id,
-            productName: item.product.variant ? `${item.product.name} (${item.product.variant})` : item.product.name,
-            quantity: item.quantity,
-            unitPrice: item.product.price || 0,
-            subtotal: (item.product.price || 0) * item.quantity,
-          });
-
-          if (!item.product.isCustom) {
-            const productDocRef = doc(firestore, "users", user.uid, "products", item.product.id);
-            const currentProduct = products.find(p => p.id === item.product.id);
-            if (currentProduct) {
-               updateDocumentNonBlocking(productDocRef, {
-                stockQuantity: Math.max(0, (currentProduct.stockQuantity || 0) - item.quantity)
-              });
-            }
-          }
+    try {
+      const saleRef = await addDoc(salesRef, saleData);
+      
+      const saleItemsRef = collection(firestore, "users", user.uid, "sales", saleRef.id, "sale_items");
+      
+      cart.forEach(item => {
+        addDocumentNonBlocking(saleItemsRef, {
+          saleId: saleRef.id,
+          productId: item.product.id,
+          productName: item.product.variant ? `${item.product.name} (${item.product.variant})` : item.product.name,
+          quantity: item.quantity,
+          unitPrice: item.product.price || 0,
+          subtotal: (item.product.price || 0) * item.quantity,
         });
 
-        if (paymentMethod === "Cuenta Corriente" && selectedCustomerId) {
-          const customer = customers.find(c => c.id === selectedCustomerId);
-          if (customer) {
-            const customerDocRef = doc(firestore, "users", user.uid, "customers", selectedCustomerId);
-            updateDocumentNonBlocking(customerDocRef, {
-              currentBalance: (customer.currentBalance || 0) + total
+        if (!item.product.isCustom) {
+          const productDocRef = doc(firestore, "users", user.uid, "products", item.product.id);
+          const currentProduct = products.find(p => p.id === item.product.id);
+          if (currentProduct) {
+             updateDocumentNonBlocking(productDocRef, {
+              stockQuantity: Math.max(0, (currentProduct.stockQuantity || 0) - item.quantity)
             });
           }
         }
-      }
-    });
+      });
 
-    toast({ title: "Venta Registrada", description: `Venta por $${total.toLocaleString()} completada.` });
-    setCart([]);
-    setIsPaymentDialogOpen(false);
-    resetPayment();
+      if (paymentMethod === "Cuenta Corriente" && selectedCustomerId) {
+        const customer = customers.find(c => c.id === selectedCustomerId);
+        if (customer) {
+          const customerDocRef = doc(firestore, "users", user.uid, "customers", selectedCustomerId);
+          updateDocumentNonBlocking(customerDocRef, {
+            currentBalance: (customer.currentBalance || 0) + total
+          });
+        }
+      }
+
+      toast({ title: "Venta Registrada", description: `Venta por $${total.toLocaleString()} completada.` });
+      setCart([]);
+      setIsPaymentDialogOpen(false);
+      resetPayment();
+    } catch (error) {
+      toast({ variant: "destructive", title: "Error al registrar venta" });
+    }
   };
 
   if (isSessionLoading) {
@@ -300,55 +316,82 @@ export default function POSPage() {
     <AppLayout>
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[calc(100vh-140px)] overflow-hidden">
         <div className="lg:col-span-8 flex flex-col space-y-4 overflow-hidden h-full">
-          <div className="flex gap-2 shrink-0">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input 
-                placeholder="Buscar productos (nombre, SKU o variante)..." 
-                className="pl-10 h-12 text-base shadow-sm bg-white"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-            
-            <Dialog open={isCustomItemDialogOpen} onOpenChange={setIsCustomItemDialogOpen}>
-              <DialogTrigger asChild>
-                <Button variant="outline" className="h-12 gap-2 border-accent text-accent hover:bg-accent/5 font-bold">
-                  <StickyNote className="h-5 w-5" />
-                  <span className="hidden sm:inline">Producto no listado</span>
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Venta de Producto Manual</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-bold">Descripción del Producto</label>
-                    <Input 
-                      placeholder="Ej: Recarga, Artículo sin código..." 
-                      value={customName}
-                      onChange={(e) => setCustomName(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-bold">Precio ($)</label>
-                    <Input 
-                      type="number" 
-                      placeholder="0.00" 
-                      className="text-xl font-bold h-12"
-                      value={customPrice || ""}
-                      onChange={(e) => setCustomPrice(Number(e.target.value))}
-                    />
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button className="w-full h-11" onClick={addCustomItem} disabled={!customName || customPrice <= 0}>
-                    Añadir al Carrito
+          <div className="flex flex-col gap-4 shrink-0">
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input 
+                  placeholder="Buscar productos (nombre, SKU o variante)..." 
+                  className="pl-10 h-12 text-base shadow-sm bg-white"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+              
+              <Dialog open={isCustomItemDialogOpen} onOpenChange={setIsCustomItemDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" className="h-12 gap-2 border-accent text-accent hover:bg-accent/5 font-bold">
+                    <StickyNote className="h-5 w-5" />
+                    <span className="hidden sm:inline">Manual</span>
                   </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Venta de Producto Manual</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-bold">Descripción del Producto</label>
+                      <Input 
+                        placeholder="Ej: Recarga, Artículo sin código..." 
+                        value={customName}
+                        onChange={(e) => setCustomName(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-bold">Precio ($)</label>
+                      <Input 
+                        type="number" 
+                        placeholder="0.00" 
+                        className="text-xl font-bold h-12"
+                        value={customPrice || ""}
+                        onChange={(e) => setCustomPrice(Number(e.target.value))}
+                      />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button className="w-full h-11" onClick={addCustomItem} disabled={!customName || customPrice <= 0}>
+                      Añadir al Carrito
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
+
+            <ScrollArea className="w-full whitespace-nowrap pb-2">
+              <div className="flex w-max space-x-2">
+                <Button
+                  variant={selectedCategoryFilter === null ? "default" : "outline"}
+                  size="sm"
+                  className="rounded-full font-bold uppercase text-[10px] tracking-wider"
+                  onClick={() => setSelectedCategoryFilter(null)}
+                >
+                  Todas
+                </Button>
+                {categories.map((cat) => (
+                  <Button
+                    key={cat.id}
+                    variant={selectedCategoryFilter === cat.name ? "default" : "outline"}
+                    size="sm"
+                    className="rounded-full font-bold uppercase text-[10px] tracking-wider"
+                    onClick={() => setSelectedCategoryFilter(cat.name)}
+                  >
+                    {cat.name}
+                  </Button>
+                ))}
+              </div>
+              <ScrollBar orientation="horizontal" />
+            </ScrollArea>
           </div>
           
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 overflow-y-auto pr-2 pb-6 flex-1">
@@ -403,6 +446,15 @@ export default function POSPage() {
                 </CardContent>
               </Card>
             ))}
+            {!isProductsLoading && filteredProducts.length === 0 && (
+              <div className="col-span-full py-20 text-center text-muted-foreground">
+                <div className="flex flex-col items-center gap-2">
+                  <Filter className="h-10 w-10 opacity-20" />
+                  <p className="font-bold">No se encontraron productos</p>
+                  <p className="text-xs">Prueba con otro filtro o término de búsqueda.</p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
