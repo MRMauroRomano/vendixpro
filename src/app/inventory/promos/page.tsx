@@ -29,9 +29,8 @@ import {
   Edit3, 
   Star,
   Layers,
-  GlassWater,
-  Cigarette,
-  ImageIcon
+  ImageIcon,
+  Check
 } from "lucide-react";
 import { 
   useFirestore, 
@@ -45,14 +44,13 @@ import {
 import { collection, doc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
-import { Label } from "@/components/ui/label";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 
 export default function PromosManagementPage() {
   const firestore = useFirestore();
@@ -279,24 +277,35 @@ export default function PromosManagementPage() {
 }
 
 function PromoFields({ promo, allProducts, bundleItems, setBundleItems }: any) {
-  const [selectedProd, setSelectedProd] = useState("");
+  const [selectedProd, setSelectedProd] = useState<any>(null);
   const [qty, setQty] = useState(1);
+  const [prodSearch, setProdSearch] = useState("");
+  const [isPopoverOpen, setIsPopoverOpen] = useState(false);
+
+  const filteredBaseProducts = useMemo(() => {
+    const term = prodSearch.toLowerCase();
+    return allProducts.filter((p: any) => 
+      p.category !== 'Promos' && 
+      (String(p.name || "").toLowerCase().includes(term) || 
+       String(p.sku || "").toLowerCase().includes(term) ||
+       String(p.variant || "").toLowerCase().includes(term))
+    );
+  }, [allProducts, prodSearch]);
 
   const addComponent = () => {
     if (!selectedProd) return;
-    const prod = allProducts.find((p: any) => p.id === selectedProd);
-    if (!prod) return;
-
-    const existingIdx = bundleItems.findIndex((bi: any) => bi.productId === prod.id);
+    
+    const existingIdx = bundleItems.findIndex((bi: any) => bi.productId === selectedProd.id);
     if (existingIdx > -1) {
       const newItems = [...bundleItems];
       newItems[existingIdx].quantity += qty;
       setBundleItems(newItems);
     } else {
-      setBundleItems([...bundleItems, { productId: prod.id, productName: prod.name, quantity: qty }]);
+      setBundleItems([...bundleItems, { productId: selectedProd.id, productName: selectedProd.name, quantity: qty }]);
     }
-    setSelectedProd("");
+    setSelectedProd(null);
     setQty(1);
+    setProdSearch("");
   };
 
   const removeComponent = (idx: number) => {
@@ -323,24 +332,75 @@ function PromoFields({ promo, allProducts, bundleItems, setBundleItems }: any) {
           <Layers className="h-3 w-3" /> Configuración de Receta
         </h4>
         <p className="text-[10px] text-muted-foreground italic">
-          Seleccione los productos individuales que se descontarán del stock al vender este combo.
+          Busque los productos individuales que se descontarán del stock al vender este combo.
         </p>
 
         <div className="flex gap-2">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground z-10" />
-            <Select value={selectedProd} onValueChange={setSelectedProd}>
-              <SelectTrigger className="pl-9">
-                <SelectValue placeholder="Buscar y elegir producto base..." />
-              </SelectTrigger>
-              <SelectContent>
-                {allProducts.filter((p: any) => p.category !== 'Promos').map((p: any) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.name} {p.variant ? `(${p.variant})` : ''}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={isPopoverOpen}
+                  className="w-full justify-between h-10 px-3 font-normal text-muted-foreground"
+                >
+                  <div className="flex items-center gap-2 overflow-hidden">
+                    <Search className="h-4 w-4 shrink-0 opacity-50" />
+                    <span className="truncate">
+                      {selectedProd ? selectedProd.name : "Buscar producto base..."}
+                    </span>
+                  </div>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[300px] p-0" align="start">
+                <div className="p-2 border-b">
+                  <div className="relative">
+                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Escribe para buscar..."
+                      className="pl-8 h-9"
+                      value={prodSearch}
+                      onChange={(e) => setProdSearch(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <ScrollArea className="h-64">
+                  {filteredBaseProducts.length === 0 ? (
+                    <div className="p-4 text-center text-xs text-muted-foreground">
+                      No se encontraron productos.
+                    </div>
+                  ) : (
+                    <div className="p-1">
+                      {filteredBaseProducts.map((p: any) => (
+                        <Button
+                          key={p.id}
+                          variant="ghost"
+                          className="w-full justify-start font-normal text-xs h-9 px-2"
+                          onClick={() => {
+                            setSelectedProd(p);
+                            setIsPopoverOpen(false);
+                          }}
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4",
+                              selectedProd?.id === p.id ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                          <div className="flex flex-col items-start truncate">
+                            <span className="font-bold">{p.name}</span>
+                            <span className="text-[9px] opacity-60">
+                              {p.category} {p.variant ? `| ${p.variant}` : ""}
+                            </span>
+                          </div>
+                        </Button>
+                      ))}
+                    </div>
+                  )}
+                </ScrollArea>
+              </PopoverContent>
+            </Popover>
           </div>
           <Input 
             type="number" 
@@ -349,7 +409,7 @@ function PromoFields({ promo, allProducts, bundleItems, setBundleItems }: any) {
             onChange={(e) => setQty(Number(e.target.value))}
             min="1"
           />
-          <Button type="button" size="icon" onClick={addComponent} className="bg-primary hover:bg-primary/90 shrink-0">
+          <Button type="button" size="icon" onClick={addComponent} className="bg-primary hover:bg-primary/90 shrink-0" disabled={!selectedProd}>
             <Plus className="h-4 w-4" />
           </Button>
         </div>
