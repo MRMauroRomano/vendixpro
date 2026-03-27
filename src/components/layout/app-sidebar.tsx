@@ -22,7 +22,8 @@ import {
   TableProperties,
   Unlock,
   Lock,
-  GlassWater
+  GlassWater,
+  Star
 } from "lucide-react";
 import {
   Sidebar,
@@ -63,6 +64,7 @@ const navItems = [
     href: "/inventory",
     items: [
       { label: "Todos los Productos", href: "/inventory", icon: Layers },
+      { label: "Promos Bebidas", href: "/inventory/promos", icon: Star },
       { label: "Modificación Masiva", href: "/inventory/bulk-edit", icon: TableProperties },
       { label: "Stock Bajo", href: "/inventory/low-stock", icon: AlertTriangle },
       { label: "Categorías", href: "/inventory/categories", icon: Tags },
@@ -119,7 +121,6 @@ export function AppSidebar() {
         <SidebarMenu>
           {navItems.map((item) => {
             const hasSubItems = item.items && item.items.length > 0;
-            // Check if current path matches item.href OR any of its subitems
             const isActive = pathname === item.href || item.items?.some(sub => {
               const [path] = sub.href.split('?');
               return pathname === path;
