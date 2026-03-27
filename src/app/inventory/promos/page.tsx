@@ -51,7 +51,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { cn } from "@/lib/utils";
 
 export default function PromosManagementPage() {
   const firestore = useFirestore();
@@ -345,34 +344,35 @@ function PromoFields({ promo, allProducts, bundleItems, setBundleItems }: any) {
                   variant="outline"
                   role="combobox"
                   aria-expanded={isPopoverOpen}
-                  className="w-full justify-between h-12 px-4 font-normal bg-white"
+                  className="w-full justify-between h-12 px-4 font-normal bg-white border-accent text-accent hover:bg-accent/5"
                 >
                   <div className="flex items-center gap-2 overflow-hidden">
                     <Search className="h-4 w-4 shrink-0 opacity-50" />
-                    <span className="truncate">
-                      {selectedProd ? selectedProd.name : "Buscar producto..."}
+                    <span className="truncate font-bold">
+                      {selectedProd ? selectedProd.name : "Buscar producto base..."}
                     </span>
                   </div>
                   <Plus className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-[320px] p-0" align="start">
-                <div className="p-2 border-b">
+              <PopoverContent className="w-[320px] p-0 shadow-2xl border-2" align="start">
+                <div className="p-2 border-b bg-muted/20">
                   <div className="relative">
                     <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input
                       placeholder="Escribe para buscar..."
-                      className="pl-8 h-10"
+                      className="pl-8 h-10 border-primary/20"
                       autoFocus
                       value={prodSearch}
                       onChange={(e) => setProdSearch(e.target.value)}
+                      onKeyDown={(e) => e.stopPropagation()} // Vital para que no se pierda el foco
                     />
                   </div>
                 </div>
                 <ScrollArea className="h-64">
                   {filteredBaseProducts.length === 0 ? (
                     <div className="p-4 text-center text-xs text-muted-foreground">
-                      No se encontraron productos base.
+                      No se encontraron productos disponibles.
                     </div>
                   ) : (
                     <div className="p-1">
@@ -384,17 +384,17 @@ function PromoFields({ promo, allProducts, bundleItems, setBundleItems }: any) {
                           onClick={() => {
                             setSelectedProd(p);
                             setIsPopoverOpen(false);
-                            setProdSearch(""); // Reset search on select
+                            setProdSearch("");
                           }}
                         >
                           <div className="flex items-center gap-3 w-full">
                             <div className="h-8 w-8 rounded bg-muted overflow-hidden shrink-0">
-                               <img src={p.imageUrl || `https://picsum.photos/seed/${p.id}/50/50`} className="h-full w-full object-cover" />
+                               <img src={p.imageUrl || `https://picsum.photos/seed/${p.id}/50/50`} className="h-full w-full object-cover" alt="" />
                             </div>
                             <div className="flex flex-col items-start truncate flex-1">
                               <span className="font-bold text-primary truncate w-full">{p.name}</span>
                               <span className="text-[9px] opacity-60">
-                                {p.category} {p.variant ? `| ${p.variant}` : ""} | SKU: {p.sku}
+                                {p.category} {p.variant ? `| ${p.variant}` : ""}
                               </span>
                             </div>
                             {selectedProd?.id === p.id && <Check className="h-4 w-4 text-accent" />}
@@ -409,7 +409,7 @@ function PromoFields({ promo, allProducts, bundleItems, setBundleItems }: any) {
           </div>
           <Input 
             type="number" 
-            className="w-20 h-12 font-bold text-center" 
+            className="w-20 h-12 font-bold text-center border-accent" 
             value={qty} 
             onChange={(e) => setQty(Number(e.target.value))}
             min="1"
@@ -418,10 +418,10 @@ function PromoFields({ promo, allProducts, bundleItems, setBundleItems }: any) {
             type="button" 
             size="icon" 
             onClick={addComponent} 
-            className="h-12 w-12 bg-primary hover:bg-primary/90 shrink-0 shadow-sm" 
+            className="h-12 w-12 bg-accent hover:bg-accent/90 shrink-0 shadow-sm" 
             disabled={!selectedProd}
           >
-            <Plus className="h-5 w-5" />
+            <Plus className="h-5 w-5 text-accent-foreground" />
           </Button>
         </div>
 
@@ -434,7 +434,7 @@ function PromoFields({ promo, allProducts, bundleItems, setBundleItems }: any) {
                 </div>
                 <div className="flex flex-col">
                   <span className="font-bold text-sm">{bi.productName}</span>
-                  <span className="text-[10px] font-black text-accent uppercase">Cantidad a descontar: {bi.quantity}</span>
+                  <span className="text-[10px] font-black text-accent uppercase">Cantidad: {bi.quantity}</span>
                 </div>
               </div>
               <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:bg-red-50 hover:text-red-600" onClick={() => removeComponent(index)}>
@@ -444,7 +444,7 @@ function PromoFields({ promo, allProducts, bundleItems, setBundleItems }: any) {
           ))}
           {bundleItems.length === 0 && (
             <div className="text-center py-6 text-muted-foreground text-[11px] italic border-2 border-dashed rounded-lg bg-background/50">
-              Aún no has añadido componentes a esta promo.
+              No has añadido componentes a este combo.
             </div>
           )}
         </div>
@@ -453,11 +453,11 @@ function PromoFields({ promo, allProducts, bundleItems, setBundleItems }: any) {
       <div className="grid grid-cols-2 gap-4">
         <div className="grid gap-2">
           <label className="text-sm font-bold">Precio del Combo ($) *</label>
-          <Input name="price" type="number" step="0.01" defaultValue={promo?.price} placeholder="0.00" className="h-12 text-lg font-bold" required />
+          <Input name="price" type="number" step="0.01" defaultValue={promo?.price} placeholder="0.00" className="h-12 text-lg font-bold border-primary/20" required />
         </div>
         <div className="grid gap-2">
           <label className="text-sm font-bold">SKU / Código Promo</label>
-          <Input name="sku" defaultValue={promo?.sku} placeholder="Opcional..." className="h-12" />
+          <Input name="sku" defaultValue={promo?.sku} placeholder="Opcional..." className="h-12 border-primary/20" />
         </div>
       </div>
     </div>
