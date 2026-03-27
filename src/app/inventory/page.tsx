@@ -48,7 +48,9 @@ import {
   FileUp,
   ImageIcon,
   AlertTriangle,
-  Cigarette
+  Cigarette,
+  Layers,
+  ShoppingBag
 } from "lucide-react";
 import { 
   useFirestore, 
@@ -64,6 +66,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
 import * as XLSX from "xlsx";
 
 export default function InventoryPage() {
@@ -80,6 +83,9 @@ export default function InventoryPage() {
   const [isVariablePrice, setIsVariablePrice] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [isDeletingAll, setIsDeletingAll] = useState(false);
+  
+  // State for bundle items (Promo components)
+  const [bundleItems, setBundleItems] = useState<any[]>([]);
 
   const productsRef = useMemoFirebase(() => {
     if (!firestore || !user?.uid) return null;
@@ -128,6 +134,7 @@ export default function InventoryPage() {
       sku: formData.get("sku") as string || (editingProduct ? editingProduct.sku : `SKU-${Date.now()}`),
       imageUrl,
       isVariablePrice: isVariablePrice,
+      bundleItems: selectedCategory === "Promos" ? bundleItems : [],
       updatedAt: new Date().toISOString()
     };
 
@@ -145,9 +152,14 @@ export default function InventoryPage() {
       setIsAddOpen(false);
     }
     
+    resetForm();
+  };
+
+  const resetForm = () => {
     setSelectedCategory("");
     setSelectedVariant("");
     setIsVariablePrice(false);
+    setBundleItems([]);
   };
 
   const handleDelete = (productId: string) => {
@@ -300,26 +312,29 @@ export default function InventoryPage() {
               Importar Excel
             </Button>
 
-            <Dialog open={isAddOpen} onOpenChange={(open) => { setIsAddOpen(open); if(!open) { setSelectedCategory(""); setSelectedVariant(""); setIsVariablePrice(false); } }}>
+            <Dialog open={isAddOpen} onOpenChange={(open) => { setIsAddOpen(open); if(!open) resetForm(); }}>
               <DialogTrigger asChild>
                 <Button className="gap-2 bg-accent text-accent-foreground hover:bg-accent/90 shadow-md">
                   <Plus className="h-4 w-4" />
                   Nuevo Producto
                 </Button>
               </DialogTrigger>
-              <DialogContent className="sm:max-w-[450px]">
+              <DialogContent className="sm:max-w-[550px]">
                 <form onSubmit={handleSaveProduct}>
                   <DialogHeader>
                     <DialogTitle>Registrar Producto</DialogTitle>
                   </DialogHeader>
                   <ProductFormFields 
                     categories={categories} 
+                    products={products}
                     selectedCategory={selectedCategory} 
                     setSelectedCategory={setSelectedCategory} 
                     selectedVariant={selectedVariant}
                     setSelectedVariant={setSelectedVariant}
                     isVariablePrice={isVariablePrice}
                     setIsVariablePrice={setIsVariablePrice}
+                    bundleItems={bundleItems}
+                    setBundleItems={setBundleItems}
                   />
                   <DialogFooter className="mt-4">
                     <Button type="submit" className="w-full h-11 font-bold">Guardar Producto</Button>
@@ -328,8 +343,8 @@ export default function InventoryPage() {
               </DialogContent>
             </Dialog>
 
-            <Dialog open={!!editingProduct} onOpenChange={(open) => { if(!open) { setEditingProduct(null); setSelectedCategory(""); setSelectedVariant(""); setIsVariablePrice(false); } }}>
-              <DialogContent className="sm:max-w-[450px]">
+            <Dialog open={!!editingProduct} onOpenChange={(open) => { if(!open) { setEditingProduct(null); resetForm(); } }}>
+              <DialogContent className="sm:max-w-[550px]">
                 {editingProduct && (
                   <form onSubmit={handleSaveProduct}>
                     <DialogHeader>
@@ -338,12 +353,15 @@ export default function InventoryPage() {
                     <ProductFormFields 
                       product={editingProduct}
                       categories={categories} 
+                      products={products}
                       selectedCategory={selectedCategory || editingProduct.category} 
                       setSelectedCategory={setSelectedCategory} 
                       selectedVariant={selectedVariant || editingProduct.variant}
                       setSelectedVariant={setSelectedVariant}
                       isVariablePrice={isVariablePrice}
                       setIsVariablePrice={setIsVariablePrice}
+                      bundleItems={bundleItems.length > 0 ? bundleItems : (editingProduct.bundleItems || [])}
+                      setBundleItems={setBundleItems}
                     />
                     <DialogFooter className="mt-4">
                       <Button type="submit" className="w-full h-11 font-bold">Actualizar Cambios</Button>
@@ -404,6 +422,9 @@ export default function InventoryPage() {
                           <span className="text-[10px] text-muted-foreground font-mono">{product.sku}</span>
                           <span className="text-[10px] bg-muted px-1.5 rounded-full font-bold uppercase">{product.unit || 'u.'}</span>
                         </div>
+                        {product.bundleItems && product.bundleItems.length > 0 && (
+                          <div className="text-[8px] text-accent font-black uppercase mt-1">Combo: {product.bundleItems.length} componentes</div>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell>
@@ -421,7 +442,7 @@ export default function InventoryPage() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditingProduct(product); setSelectedCategory(product.category); setSelectedVariant(product.variant || ""); setIsVariablePrice(!!product.isVariablePrice); }}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditingProduct(product); setSelectedCategory(product.category); setSelectedVariant(product.variant || ""); setIsVariablePrice(!!product.isVariablePrice); setBundleItems(product.bundleItems || []); }}>
                           <Edit3 className="h-4 w-4" />
                         </Button>
                         <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={() => handleDelete(product.id)}>
@@ -447,12 +468,36 @@ export default function InventoryPage() {
   );
 }
 
-function ProductFormFields({ product, categories, selectedCategory, setSelectedCategory, selectedVariant, setSelectedVariant, isVariablePrice, setIsVariablePrice }: any) {
+function ProductFormFields({ product, categories, products, selectedCategory, setSelectedCategory, selectedVariant, setSelectedVariant, isVariablePrice, setIsVariablePrice, bundleItems, setBundleItems }: any) {
+  const [selectedBundleItem, setSelectedBundleItem] = useState<string>("");
+  const [bundleQty, setBundleQty] = useState<number>(1);
+
+  const addBundleItem = () => {
+    if (!selectedBundleItem) return;
+    const prod = products.find((p: any) => p.id === selectedBundleItem);
+    if (!prod) return;
+
+    const existingIndex = bundleItems.findIndex((bi: any) => bi.productId === prod.id);
+    if (existingIndex > -1) {
+      const newItems = [...bundleItems];
+      newItems[existingIndex].quantity += bundleQty;
+      setBundleItems(newItems);
+    } else {
+      setBundleItems([...bundleItems, { productId: prod.id, productName: prod.name, quantity: bundleQty }]);
+    }
+    setSelectedBundleItem("");
+    setBundleQty(1);
+  };
+
+  const removeBundleItem = (index: number) => {
+    setBundleItems(bundleItems.filter((_: any, i: number) => i !== index));
+  };
+
   return (
-    <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto px-1">
+    <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto px-1">
       <div className="grid gap-2">
         <label className="text-sm font-bold">Nombre del Producto *</label>
-        <Input name="name" defaultValue={product?.name} placeholder="Ej: Marlboro" required />
+        <Input name="name" defaultValue={product?.name} placeholder="Ej: Combo Fernet" required />
       </div>
       
       <div className="grid gap-2">
@@ -497,6 +542,44 @@ function ProductFormFields({ product, categories, selectedCategory, setSelectedC
         )}
       </div>
 
+      {selectedCategory === "Promos" && (
+        <div className="space-y-3 bg-muted/30 p-4 rounded-xl border-2 border-primary/10 animate-in zoom-in-95">
+          <h4 className="text-xs font-black uppercase tracking-widest text-primary flex items-center gap-2">
+            <Layers className="h-3 w-3" /> Receta / Componentes de la Promo
+          </h4>
+          <p className="text-[10px] text-muted-foreground">Define qué productos se descuentan al vender esta promo.</p>
+          
+          <div className="flex gap-2">
+            <Select value={selectedBundleItem} onValueChange={setSelectedBundleItem}>
+              <SelectTrigger className="flex-1"><SelectValue placeholder="Elegir producto..." /></SelectTrigger>
+              <SelectContent>
+                {products.filter((p: any) => p.category !== 'Promos').map((p: any) => (
+                  <SelectItem key={p.id} value={p.id}>{p.name} ({p.variant || 'u.'})</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Input 
+              type="number" 
+              className="w-20 font-bold" 
+              value={bundleQty} 
+              onChange={(e) => setBundleQty(Number(e.target.value))}
+            />
+            <Button type="button" size="icon" onClick={addBundleItem} className="shrink-0"><Plus className="h-4 w-4" /></Button>
+          </div>
+
+          <div className="space-y-1">
+            {bundleItems.map((bi: any, index: number) => (
+              <div key={index} className="flex justify-between items-center text-xs bg-white p-2 rounded border">
+                <span className="font-bold">{bi.productName} <span className="text-muted-foreground">x{bi.quantity}</span></span>
+                <Button type="button" variant="ghost" size="icon" className="h-6 w-6 text-red-500" onClick={() => removeBundleItem(index)}>
+                  <Trash2 className="h-3 w-3" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center space-x-2 bg-primary/5 p-4 rounded-xl border-2 border-dashed border-primary/20">
         <Switch id="variable-price" checked={isVariablePrice} onCheckedChange={setIsVariablePrice} />
         <Label htmlFor="variable-price" className="text-sm font-black text-primary uppercase tracking-tight cursor-pointer">Venta por Peso / Precio Variable</Label>
@@ -508,7 +591,7 @@ function ProductFormFields({ product, categories, selectedCategory, setSelectedC
           <Input name="price" type="number" step="0.01" defaultValue={product?.price} placeholder="0.00" required />
         </div>
         <div className="grid gap-2">
-          <label className="text-sm font-bold">Stock Inicial *</label>
+          <label className="text-sm font-bold">{selectedCategory === 'Promos' ? "Stock de Combos (Opc)" : "Stock Inicial *"}</label>
           <Input name="stock" type="number" defaultValue={product?.stockQuantity} placeholder="0" required />
         </div>
       </div>

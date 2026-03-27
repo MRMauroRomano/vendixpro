@@ -39,7 +39,19 @@
         "category": { "type": "string" },
         "variant": { "type": "string", "description": "Variante específica (ej: BOX 20 para cigarrillos)" },
         "imageUrl": { "type": "string", "description": "URL of the product image" },
-        "isVariablePrice": { "type": "boolean", "description": "If true, POS will prompt for price" }
+        "isVariablePrice": { "type": "boolean", "description": "If true, POS will prompt for price" },
+        "bundleItems": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "productId": { "type": "string" },
+              "productName": { "type": "string" },
+              "quantity": { "type": "number" }
+            }
+          },
+          "description": "List of products and quantities that make up this promo/combo."
+        }
       },
       "required": ["id", "name", "price", "stockQuantity"]
     },

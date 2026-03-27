@@ -23,7 +23,8 @@ import {
   Lock,
   Filter,
   GlassWater,
-  Star
+  Star,
+  Layers
 } from "lucide-react";
 import { 
   useCollection, 
@@ -263,13 +264,34 @@ export default function POSPage() {
           subtotal: (item.product.price || 0) * item.quantity,
         });
 
+        // Lógica de Descuento de Stock
         if (!item.product.isCustom) {
-          const productDocRef = doc(firestore, "users", user.uid, "products", item.product.id);
-          const currentProduct = products.find(p => p.id === item.product.id);
-          if (currentProduct) {
-             updateDocumentNonBlocking(productDocRef, {
-              stockQuantity: Math.max(0, (currentProduct.stockQuantity || 0) - item.quantity)
+          // Si es una PROMO con componentes definidos
+          if (item.product.category === "Promos" && item.product.bundleItems && item.product.bundleItems.length > 0) {
+            item.product.bundleItems.forEach((bundleItem: any) => {
+              const componentDocRef = doc(firestore, "users", user.uid, "products", bundleItem.productId);
+              const originalProduct = products.find(p => p.id === bundleItem.productId);
+              if (originalProduct) {
+                const totalDeduction = bundleItem.quantity * item.quantity;
+                updateDocumentNonBlocking(componentDocRef, {
+                  stockQuantity: Math.max(0, (originalProduct.stockQuantity || 0) - totalDeduction)
+                });
+              }
             });
+            // También descontamos el stock de la promo misma si tiene stock propio
+            const promoDocRef = doc(firestore, "users", user.uid, "products", item.product.id);
+            updateDocumentNonBlocking(promoDocRef, {
+              stockQuantity: Math.max(0, (item.product.stockQuantity || 0) - item.quantity)
+            });
+          } else {
+            // Producto estándar
+            const productDocRef = doc(firestore, "users", user.uid, "products", item.product.id);
+            const currentProduct = products.find(p => p.id === item.product.id);
+            if (currentProduct) {
+               updateDocumentNonBlocking(productDocRef, {
+                stockQuantity: Math.max(0, (currentProduct.stockQuantity || 0) - item.quantity)
+              });
+            }
           }
         }
       });
@@ -452,6 +474,12 @@ export default function POSPage() {
                         VARIABLE
                       </Badge>
                     )}
+                    {product.bundleItems && product.bundleItems.length > 0 && (
+                      <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 font-black text-[8px] gap-1">
+                        <Layers className="h-2 w-2" />
+                        COMBO
+                      </Badge>
+                    )}
                   </div>
                 </div>
                 <CardContent className="p-4 space-y-2 flex-1 flex flex-col">
@@ -516,6 +544,9 @@ export default function POSPage() {
                         {item.product.variant && <span className="ml-1 text-[9px] opacity-60">({item.product.variant})</span>}
                       </div>
                       <div className="text-[10px] text-muted-foreground">${(item.product.price || 0).toLocaleString()} c/u</div>
+                      {item.product.bundleItems && item.product.bundleItems.length > 0 && (
+                        <div className="text-[8px] text-accent font-black uppercase">Combo: {item.product.bundleItems.map((bi: any) => bi.productName).join(', ')}</div>
+                      )}
                     </div>
                     <div className="flex flex-col items-end gap-1">
                       <div className="flex items-center gap-1.5 bg-muted/50 rounded p-0.5 border">
