@@ -30,7 +30,8 @@ import {
   Star,
   Layers,
   ImageIcon,
-  Check
+  Check,
+  Package
 } from "lucide-react";
 import { 
   useFirestore, 
@@ -264,9 +265,8 @@ export default function PromosManagementPage() {
                         <Star className="h-12 w-12" />
                         <p className="text-lg font-black uppercase tracking-widest">No hay promos cargadas</p>
                       </div>
-                    </TableCell>
-                  </TableRow>
-                )}
+                    </TableRow>
+                  )}
               </TableBody>
             </Table>
           </div>
@@ -282,9 +282,10 @@ function PromoFields({ promo, allProducts, bundleItems, setBundleItems }: any) {
   const [prodSearch, setProdSearch] = useState("");
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
 
+  // Filtrado optimizado de productos base
   const filteredBaseProducts = useMemo(() => {
     const term = prodSearch.toLowerCase();
-    return allProducts.filter((p: any) => 
+    return (allProducts || []).filter((p: any) => 
       p.category !== 'Promos' && 
       (String(p.name || "").toLowerCase().includes(term) || 
        String(p.sku || "").toLowerCase().includes(term) ||
@@ -343,23 +344,25 @@ function PromoFields({ promo, allProducts, bundleItems, setBundleItems }: any) {
                   variant="outline"
                   role="combobox"
                   aria-expanded={isPopoverOpen}
-                  className="w-full justify-between h-10 px-3 font-normal text-muted-foreground"
+                  className="w-full justify-between h-12 px-4 font-normal bg-white"
                 >
                   <div className="flex items-center gap-2 overflow-hidden">
                     <Search className="h-4 w-4 shrink-0 opacity-50" />
                     <span className="truncate">
-                      {selectedProd ? selectedProd.name : "Buscar producto base..."}
+                      {selectedProd ? selectedProd.name : "Buscar producto..."}
                     </span>
                   </div>
+                  <Plus className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-[300px] p-0" align="start">
+              <PopoverContent className="w-[320px] p-0" align="start">
                 <div className="p-2 border-b">
                   <div className="relative">
                     <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input
                       placeholder="Escribe para buscar..."
-                      className="pl-8 h-9"
+                      className="pl-8 h-10"
+                      autoFocus
                       value={prodSearch}
                       onChange={(e) => setProdSearch(e.target.value)}
                     />
@@ -368,7 +371,7 @@ function PromoFields({ promo, allProducts, bundleItems, setBundleItems }: any) {
                 <ScrollArea className="h-64">
                   {filteredBaseProducts.length === 0 ? (
                     <div className="p-4 text-center text-xs text-muted-foreground">
-                      No se encontraron productos.
+                      No se encontraron productos base.
                     </div>
                   ) : (
                     <div className="p-1">
@@ -376,23 +379,24 @@ function PromoFields({ promo, allProducts, bundleItems, setBundleItems }: any) {
                         <Button
                           key={p.id}
                           variant="ghost"
-                          className="w-full justify-start font-normal text-xs h-9 px-2"
+                          className="w-full justify-start font-normal text-xs h-12 px-2 hover:bg-primary/5"
                           onClick={() => {
                             setSelectedProd(p);
                             setIsPopoverOpen(false);
+                            setProdSearch(""); // Reset search on select
                           }}
                         >
-                          <Check
-                            className={cn(
-                              "mr-2 h-4 w-4",
-                              selectedProd?.id === p.id ? "opacity-100" : "opacity-0"
-                            )}
-                          />
-                          <div className="flex flex-col items-start truncate">
-                            <span className="font-bold">{p.name}</span>
-                            <span className="text-[9px] opacity-60">
-                              {p.category} {p.variant ? `| ${p.variant}` : ""}
-                            </span>
+                          <div className="flex items-center gap-3 w-full">
+                            <div className="h-8 w-8 rounded bg-muted overflow-hidden shrink-0">
+                               <img src={p.imageUrl || `https://picsum.photos/seed/${p.id}/50/50`} className="h-full w-full object-cover" />
+                            </div>
+                            <div className="flex flex-col items-start truncate flex-1">
+                              <span className="font-bold text-primary truncate w-full">{p.name}</span>
+                              <span className="text-[9px] opacity-60">
+                                {p.category} {p.variant ? `| ${p.variant}` : ""} | SKU: {p.sku}
+                              </span>
+                            </div>
+                            {selectedProd?.id === p.id && <Check className="h-4 w-4 text-accent" />}
                           </div>
                         </Button>
                       ))}
@@ -404,30 +408,41 @@ function PromoFields({ promo, allProducts, bundleItems, setBundleItems }: any) {
           </div>
           <Input 
             type="number" 
-            className="w-20 font-bold" 
+            className="w-20 h-12 font-bold text-center" 
             value={qty} 
             onChange={(e) => setQty(Number(e.target.value))}
             min="1"
           />
-          <Button type="button" size="icon" onClick={addComponent} className="bg-primary hover:bg-primary/90 shrink-0" disabled={!selectedProd}>
-            <Plus className="h-4 w-4" />
+          <Button 
+            type="button" 
+            size="icon" 
+            onClick={addComponent} 
+            className="h-12 w-12 bg-primary hover:bg-primary/90 shrink-0 shadow-sm" 
+            disabled={!selectedProd}
+          >
+            <Plus className="h-5 w-5" />
           </Button>
         </div>
 
         <div className="space-y-2">
           {bundleItems.map((bi: any, index: number) => (
-            <div key={index} className="flex justify-between items-center text-xs bg-white p-3 rounded-lg border shadow-sm">
+            <div key={index} className="flex justify-between items-center text-xs bg-white p-3 rounded-lg border shadow-sm animate-in fade-in slide-in-from-top-1">
               <div className="flex items-center gap-3">
-                <span className="font-black text-accent bg-accent/10 px-2 py-0.5 rounded">x{bi.quantity}</span>
-                <span className="font-bold">{bi.productName}</span>
+                <div className="bg-accent/10 p-1.5 rounded-md">
+                   <Package className="h-3.5 w-3.5 text-accent" />
+                </div>
+                <div className="flex flex-col">
+                  <span className="font-bold text-sm">{bi.productName}</span>
+                  <span className="text-[10px] font-black text-accent uppercase">Cantidad a descontar: {bi.quantity}</span>
+                </div>
               </div>
-              <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-red-500 hover:bg-red-50" onClick={() => removeComponent(index)}>
+              <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:bg-red-50 hover:text-red-600" onClick={() => removeComponent(index)}>
                 <Trash2 className="h-4 w-4" />
               </Button>
             </div>
           ))}
           {bundleItems.length === 0 && (
-            <div className="text-center py-4 text-muted-foreground text-[11px] italic">
+            <div className="text-center py-6 text-muted-foreground text-[11px] italic border-2 border-dashed rounded-lg bg-background/50">
               Aún no has añadido componentes a esta promo.
             </div>
           )}
@@ -437,11 +452,11 @@ function PromoFields({ promo, allProducts, bundleItems, setBundleItems }: any) {
       <div className="grid grid-cols-2 gap-4">
         <div className="grid gap-2">
           <label className="text-sm font-bold">Precio del Combo ($) *</label>
-          <Input name="price" type="number" step="0.01" defaultValue={promo?.price} placeholder="0.00" required />
+          <Input name="price" type="number" step="0.01" defaultValue={promo?.price} placeholder="0.00" className="h-12 text-lg font-bold" required />
         </div>
         <div className="grid gap-2">
-          <label className="text-sm font-bold">SKU / Código</label>
-          <Input name="sku" defaultValue={promo?.sku} placeholder="Opcional..." />
+          <label className="text-sm font-bold">SKU / Código Promo</label>
+          <Input name="sku" defaultValue={promo?.sku} placeholder="Opcional..." className="h-12" />
         </div>
       </div>
     </div>
