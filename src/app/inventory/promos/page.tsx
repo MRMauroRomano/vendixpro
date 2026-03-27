@@ -265,8 +265,9 @@ export default function PromosManagementPage() {
                         <Star className="h-12 w-12" />
                         <p className="text-lg font-black uppercase tracking-widest">No hay promos cargadas</p>
                       </div>
-                    </TableRow>
-                  )}
+                    </TableCell>
+                  </TableRow>
+                )}
               </TableBody>
             </Table>
           </div>
