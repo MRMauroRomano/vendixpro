@@ -171,10 +171,10 @@ export default function PromosManagementPage() {
         </div>
 
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
           <Input 
             placeholder="Buscar por nombre de combo..." 
-            className="pl-12 h-12 text-base shadow-sm bg-white" 
+            className="pl-12 h-12 text-base shadow-sm bg-white border-primary/20" 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -327,18 +327,21 @@ function PromoFields({ promo, allProducts, bundleItems, setBundleItems }: any) {
         </p>
 
         <div className="flex gap-2">
-          <Select value={selectedProd} onValueChange={setSelectedProd}>
-            <SelectTrigger className="flex-1">
-              <SelectValue placeholder="Elegir producto base..." />
-            </SelectTrigger>
-            <SelectContent>
-              {allProducts.filter((p: any) => p.category !== 'Promos').map((p: any) => (
-                <SelectItem key={p.id} value={p.id}>
-                  {p.name} {p.variant ? `(${p.variant})` : ''}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground z-10" />
+            <Select value={selectedProd} onValueChange={setSelectedProd}>
+              <SelectTrigger className="pl-9">
+                <SelectValue placeholder="Buscar y elegir producto base..." />
+              </SelectTrigger>
+              <SelectContent>
+                {allProducts.filter((p: any) => p.category !== 'Promos').map((p: any) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.name} {p.variant ? `(${p.variant})` : ''}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <Input 
             type="number" 
             className="w-20 font-bold" 
