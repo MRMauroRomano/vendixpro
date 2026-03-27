@@ -162,6 +162,14 @@ export default function InventoryPage() {
     setBundleItems([]);
   };
 
+  const handleEditClick = (product: any) => {
+    setEditingProduct(product);
+    setSelectedCategory(product.category || "");
+    setSelectedVariant(product.variant || "");
+    setIsVariablePrice(!!product.isVariablePrice);
+    setBundleItems(product.bundleItems || []);
+  };
+
   const handleDelete = (productId: string) => {
     if (!user?.uid || !firestore) return;
     const docRef = doc(firestore, "users", user.uid, "products", productId);
@@ -354,13 +362,13 @@ export default function InventoryPage() {
                       product={editingProduct}
                       categories={categories} 
                       products={products}
-                      selectedCategory={selectedCategory || editingProduct.category} 
+                      selectedCategory={selectedCategory} 
                       setSelectedCategory={setSelectedCategory} 
-                      selectedVariant={selectedVariant || editingProduct.variant}
+                      selectedVariant={selectedVariant}
                       setSelectedVariant={setSelectedVariant}
                       isVariablePrice={isVariablePrice}
                       setIsVariablePrice={setIsVariablePrice}
-                      bundleItems={bundleItems.length > 0 ? bundleItems : (editingProduct.bundleItems || [])}
+                      bundleItems={bundleItems}
                       setBundleItems={setBundleItems}
                     />
                     <DialogFooter className="mt-4">
@@ -442,7 +450,7 @@ export default function InventoryPage() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditingProduct(product); setSelectedCategory(product.category); setSelectedVariant(product.variant || ""); setIsVariablePrice(!!product.isVariablePrice); setBundleItems(product.bundleItems || []); }}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditClick(product)}>
                           <Edit3 className="h-4 w-4" />
                         </Button>
                         <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={() => handleDelete(product.id)}>

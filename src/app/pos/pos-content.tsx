@@ -266,10 +266,11 @@ export default function POSContent() {
 
         // Lógica de Descuento de Stock
         if (!item.product.isCustom) {
-          // Si es una PROMO con componentes definidos
+          // Si es una PROMO con componentes definidos (Receta)
           if (item.product.category === "Promos" && item.product.bundleItems && item.product.bundleItems.length > 0) {
             item.product.bundleItems.forEach((bundleItem: any) => {
               const componentDocRef = doc(firestore, "users", user.uid, "products", bundleItem.productId);
+              // Buscamos el producto en la lista local para obtener su stock actual
               const originalProduct = products.find(p => p.id === bundleItem.productId);
               if (originalProduct) {
                 const totalDeduction = bundleItem.quantity * item.quantity;
@@ -278,7 +279,7 @@ export default function POSContent() {
                 });
               }
             });
-            // También descontamos el stock de la promo misma si tiene stock propio
+            // También descontamos el stock de la promo misma si tiene stock propio cargado
             const promoDocRef = doc(firestore, "users", user.uid, "products", item.product.id);
             updateDocumentNonBlocking(promoDocRef, {
               stockQuantity: Math.max(0, (item.product.stockQuantity || 0) - item.quantity)
