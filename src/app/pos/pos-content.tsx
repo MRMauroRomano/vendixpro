@@ -66,6 +66,7 @@ export default function POSContent() {
   const { user } = useUser();
   const { toast } = useToast();
   const searchParams = useSearchParams();
+  const categoryParam = searchParams.get("category");
 
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -85,11 +86,10 @@ export default function POSContent() {
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
 
   useEffect(() => {
-    const cat = searchParams.get("category");
-    if (cat) {
-      setSelectedCategoryFilter(cat);
+    if (categoryParam) {
+      setSelectedCategoryFilter(categoryParam);
     }
-  }, [searchParams]);
+  }, [categoryParam]);
 
   const activeSessionQuery = useMemoFirebase(() => {
     if (!firestore || !user?.uid) return null;

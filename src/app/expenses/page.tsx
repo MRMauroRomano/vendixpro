@@ -56,12 +56,19 @@ export default function ExpensesPage() {
   const { data: activeSessions, isLoading: isSessionLoading } = useCollection(activeSessionQuery);
   const isCashOpen = activeSessions && activeSessions.length > 0;
 
-  const expensesRef = useMemoFirebase(() => {
+  // Referencia base para escrituras
+  const baseExpensesRef = useMemoFirebase(() => {
     if (!firestore || !user?.uid) return null;
-    return query(collection(firestore, "users", user.uid, "expenses"), orderBy("date", "desc"));
+    return collection(firestore, "users", user.uid, "expenses");
   }, [firestore, user?.uid]);
 
-  const { data: expensesData, isLoading } = useCollection(expensesRef);
+  // Consulta para lecturas ordenadas
+  const expensesQuery = useMemoFirebase(() => {
+    if (!baseExpensesRef) return null;
+    return query(baseExpensesRef, orderBy("date", "desc"));
+  }, [baseExpensesRef]);
+
+  const { data: expensesData, isLoading } = useCollection(expensesQuery);
   const expenses = expensesData || [];
 
   const stats = useMemo(() => {
@@ -100,7 +107,7 @@ export default function ExpensesPage() {
 
   const handleSaveExpense = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!user || !expensesRef) return;
+    if (!user || !baseExpensesRef) return;
 
     const formData = new FormData(e.currentTarget);
     const amount = Number(formData.get("amount"));
@@ -116,7 +123,7 @@ export default function ExpensesPage() {
       createdAt: new Date().toISOString()
     };
 
-    addDocumentNonBlocking(expensesRef, newExpense);
+    addDocumentNonBlocking(baseExpensesRef, newExpense);
     toast({ 
       title: "Gasto Registrado", 
       description: `Se guardó "${concept}" por $${amount.toLocaleString()}.` 

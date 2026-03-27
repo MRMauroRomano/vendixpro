@@ -31,7 +31,6 @@ import {
   Layers,
   ImageIcon,
   Package,
-  X,
   Minus as MinusIcon
 } from "lucide-react";
 import { 
@@ -283,7 +282,7 @@ function PromoFields({ promo, allProducts, bundleItems, setBundleItems }: any) {
       (String(p.name || "").toLowerCase().includes(term) || 
        String(p.sku || "").toLowerCase().includes(term) ||
        String(p.variant || "").toLowerCase().includes(term))
-    ).slice(0, 5); // Limitamos a 5 resultados para no saturar
+    ).slice(0, 5);
   }, [allProducts, prodSearch]);
 
   const addComponent = (product: any) => {
@@ -340,6 +339,8 @@ function PromoFields({ promo, allProducts, bundleItems, setBundleItems }: any) {
               className="h-11 bg-white border-accent/40 focus:ring-accent"
               value={prodSearch}
               onChange={(e) => setProdSearch(e.target.value)}
+              onKeyDown={(e) => e.stopPropagation()}
+              autoFocus
             />
             {filteredBaseProducts.length > 0 && (
               <div className="absolute top-full left-0 w-full bg-white border shadow-xl rounded-lg mt-1 z-50 overflow-hidden divide-y">
