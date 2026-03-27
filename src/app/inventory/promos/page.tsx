@@ -31,7 +31,8 @@ import {
   Layers,
   ImageIcon,
   Check,
-  Package
+  Package,
+  X
 } from "lucide-react";
 import { 
   useFirestore, 
@@ -277,14 +278,12 @@ export default function PromosManagementPage() {
 }
 
 function PromoFields({ promo, allProducts, bundleItems, setBundleItems }: any) {
-  const [selectedProd, setSelectedProd] = useState<any>(null);
-  const [qty, setQty] = useState(1);
   const [prodSearch, setProdSearch] = useState("");
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
 
   // Filtrado optimizado de productos base
   const filteredBaseProducts = useMemo(() => {
-    const term = prodSearch.toLowerCase();
+    const term = prodSearch.toLowerCase().trim();
     return (allProducts || []).filter((p: any) => 
       p.category !== 'Promos' && 
       (String(p.name || "").toLowerCase().includes(term) || 
@@ -293,24 +292,27 @@ function PromoFields({ promo, allProducts, bundleItems, setBundleItems }: any) {
     );
   }, [allProducts, prodSearch]);
 
-  const addComponent = () => {
-    if (!selectedProd) return;
-    
-    const existingIdx = bundleItems.findIndex((bi: any) => bi.productId === selectedProd.id);
+  const addComponent = (product: any) => {
+    const existingIdx = bundleItems.findIndex((bi: any) => bi.productId === product.id);
     if (existingIdx > -1) {
       const newItems = [...bundleItems];
-      newItems[existingIdx].quantity += qty;
+      newItems[existingIdx].quantity += 1;
       setBundleItems(newItems);
     } else {
-      setBundleItems([...bundleItems, { productId: selectedProd.id, productName: selectedProd.name, quantity: qty }]);
+      setBundleItems([...bundleItems, { productId: product.id, productName: product.name, quantity: 1 }]);
     }
-    setSelectedProd(null);
-    setQty(1);
     setProdSearch("");
+    setIsPopoverOpen(false);
   };
 
   const removeComponent = (idx: number) => {
     setBundleItems(bundleItems.filter((_: any, i: number) => i !== idx));
+  };
+
+  const updateQuantity = (idx: number, delta: number) => {
+    const newItems = [...bundleItems];
+    newItems[idx].quantity = Math.max(1, newItems[idx].quantity + delta);
+    setBundleItems(newItems);
   };
 
   return (
@@ -332,97 +334,75 @@ function PromoFields({ promo, allProducts, bundleItems, setBundleItems }: any) {
         <h4 className="text-xs font-black uppercase tracking-widest text-primary flex items-center gap-2">
           <Layers className="h-3 w-3" /> Configuración de Receta
         </h4>
-        <p className="text-[10px] text-muted-foreground italic">
-          Busque los productos individuales que se descontarán del stock al vender este combo.
-        </p>
-
-        <div className="flex gap-2">
-          <div className="relative flex-1">
-            <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  role="combobox"
-                  aria-expanded={isPopoverOpen}
-                  className="w-full justify-between h-12 px-4 font-normal bg-white border-accent text-accent hover:bg-accent/5"
-                >
-                  <div className="flex items-center gap-2 overflow-hidden">
-                    <Search className="h-4 w-4 shrink-0 opacity-50" />
-                    <span className="truncate font-bold">
-                      {selectedProd ? selectedProd.name : "Buscar producto base..."}
-                    </span>
-                  </div>
-                  <Plus className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[320px] p-0 shadow-2xl border-2" align="start">
-                <div className="p-2 border-b bg-muted/20">
-                  <div className="relative">
-                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Escribe para buscar..."
-                      className="pl-8 h-10 border-primary/20"
-                      autoFocus
-                      value={prodSearch}
-                      onChange={(e) => setProdSearch(e.target.value)}
-                      onKeyDown={(e) => e.stopPropagation()} // Vital para que no se pierda el foco
-                    />
-                  </div>
+        
+        <div className="relative">
+          <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className="w-full h-12 justify-between border-accent text-accent hover:bg-accent/5 font-bold"
+              >
+                <div className="flex items-center gap-2">
+                  <Search className="h-4 w-4" />
+                  <span>Buscar productos base...</span>
                 </div>
-                <ScrollArea className="h-64">
+                <Plus className="h-4 w-4 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[400px] p-0 shadow-2xl border-2" align="start">
+              <div className="p-3 border-b bg-muted/20">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Escriba para buscar..."
+                    className="pl-10 h-10 border-primary/20"
+                    autoFocus
+                    value={prodSearch}
+                    onChange={(e) => setProdSearch(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Escape') setIsPopoverOpen(false);
+                      e.stopPropagation(); // Previene que el diálogo capture la tecla
+                    }}
+                  />
+                </div>
+              </div>
+              <ScrollArea className="h-72">
+                <div className="p-1">
                   {filteredBaseProducts.length === 0 ? (
-                    <div className="p-4 text-center text-xs text-muted-foreground">
-                      No se encontraron productos disponibles.
+                    <div className="p-4 text-center text-xs text-muted-foreground italic">
+                      No se encontraron productos.
                     </div>
                   ) : (
-                    <div className="p-1">
-                      {filteredBaseProducts.map((p: any) => (
-                        <Button
-                          key={p.id}
-                          variant="ghost"
-                          className="w-full justify-start font-normal text-xs h-12 px-2 hover:bg-primary/5"
-                          onClick={() => {
-                            setSelectedProd(p);
-                            setIsPopoverOpen(false);
-                            setProdSearch("");
-                          }}
-                        >
-                          <div className="flex items-center gap-3 w-full">
-                            <div className="h-8 w-8 rounded bg-muted overflow-hidden shrink-0">
-                               <img src={p.imageUrl || `https://picsum.photos/seed/${p.id}/50/50`} className="h-full w-full object-cover" alt="" />
-                            </div>
-                            <div className="flex flex-col items-start truncate flex-1">
-                              <span className="font-bold text-primary truncate w-full">{p.name}</span>
-                              <span className="text-[9px] opacity-60">
-                                {p.category} {p.variant ? `| ${p.variant}` : ""}
-                              </span>
-                            </div>
-                            {selectedProd?.id === p.id && <Check className="h-4 w-4 text-accent" />}
-                          </div>
-                        </Button>
-                      ))}
-                    </div>
+                    filteredBaseProducts.map((p: any) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        className="w-full flex items-center gap-3 p-2 hover:bg-primary/5 rounded-md transition-colors text-left"
+                        onClick={() => addComponent(p)}
+                      >
+                        <div className="h-10 w-10 rounded border bg-muted overflow-hidden shrink-0">
+                          <img 
+                            src={p.imageUrl || `https://picsum.photos/seed/${p.id}/50/50`} 
+                            className="h-full w-full object-cover" 
+                            alt="" 
+                          />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-bold text-primary truncate">{p.name}</p>
+                          <p className="text-[10px] text-muted-foreground truncate">
+                            {p.category} {p.variant ? `| ${p.variant}` : ""} | SKU: {p.sku}
+                          </p>
+                        </div>
+                        <Badge variant="outline" className="shrink-0 text-[10px] font-black">
+                          {p.stockQuantity} u.
+                        </Badge>
+                      </button>
+                    ))
                   )}
-                </ScrollArea>
-              </PopoverContent>
-            </Popover>
-          </div>
-          <Input 
-            type="number" 
-            className="w-20 h-12 font-bold text-center border-accent" 
-            value={qty} 
-            onChange={(e) => setQty(Number(e.target.value))}
-            min="1"
-          />
-          <Button 
-            type="button" 
-            size="icon" 
-            onClick={addComponent} 
-            className="h-12 w-12 bg-accent hover:bg-accent/90 shrink-0 shadow-sm" 
-            disabled={!selectedProd}
-          >
-            <Plus className="h-5 w-5 text-accent-foreground" />
-          </Button>
+                </div>
+              </ScrollArea>
+            </PopoverContent>
+          </Popover>
         </div>
 
         <div className="space-y-2">
@@ -434,17 +414,29 @@ function PromoFields({ promo, allProducts, bundleItems, setBundleItems }: any) {
                 </div>
                 <div className="flex flex-col">
                   <span className="font-bold text-sm">{bi.productName}</span>
-                  <span className="text-[10px] font-black text-accent uppercase">Cantidad: {bi.quantity}</span>
+                  <span className="text-[10px] text-muted-foreground uppercase">Descuenta de inventario</span>
                 </div>
               </div>
-              <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:bg-red-50 hover:text-red-600" onClick={() => removeComponent(index)}>
-                <Trash2 className="h-4 w-4" />
-              </Button>
+              
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 bg-muted/50 p-1 rounded-md border">
+                  <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => updateQuantity(index, -1)}>
+                    <Minus className="h-3 w-3" />
+                  </Button>
+                  <span className="w-4 text-center font-bold">{bi.quantity}</span>
+                  <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => updateQuantity(index, 1)}>
+                    <Plus className="h-3 w-3" />
+                  </Button>
+                </div>
+                <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:bg-red-50" onClick={() => removeComponent(index)}>
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           ))}
           {bundleItems.length === 0 && (
-            <div className="text-center py-6 text-muted-foreground text-[11px] italic border-2 border-dashed rounded-lg bg-background/50">
-              No has añadido componentes a este combo.
+            <div className="text-center py-8 text-muted-foreground text-[11px] italic border-2 border-dashed rounded-lg bg-background/50">
+              Usa el buscador arriba para añadir los productos que se descuentan con este combo.
             </div>
           )}
         </div>
@@ -462,4 +454,8 @@ function PromoFields({ promo, allProducts, bundleItems, setBundleItems }: any) {
       </div>
     </div>
   );
+}
+
+function Minus({ className }: { className?: string }) {
+  return <X className={className} style={{ transform: 'rotate(45deg)' }} />
 }
