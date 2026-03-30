@@ -21,7 +21,9 @@ import {
   ImageIcon,
   DollarSign,
   CheckCircle2,
-  XCircle
+  XCircle,
+  Hash,
+  Barcode
 } from "lucide-react";
 import { 
   useFirestore, 
@@ -140,8 +142,8 @@ export default function BulkEditPage() {
       <div className="space-y-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold font-headline text-primary">Edición Rápida</h1>
-            <p className="text-muted-foreground">Modifica precios, stock e imágenes directamente en la lista.</p>
+            <h1 className="text-3xl font-bold font-headline text-primary uppercase tracking-tight">Edición Rápida</h1>
+            <p className="text-muted-foreground italic">Modifica SKU, Precios y Stock directamente en la lista.</p>
           </div>
           <div className="relative w-full md:max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
@@ -158,7 +160,7 @@ export default function BulkEditPage() {
           <CardHeader className="bg-muted/30 border-b py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
             <CardTitle className="text-sm font-black uppercase tracking-widest flex items-center gap-2">
               <Package className="h-4 w-4 text-accent" />
-              Lista de Productos ({filteredProducts.length})
+              Catálogo de Productos ({filteredProducts.length})
             </CardTitle>
             <div className="flex items-center gap-3">
               <Badge variant="outline" className="bg-white font-bold text-primary px-3 py-1">
@@ -183,17 +185,18 @@ export default function BulkEditPage() {
                 <TableHeader className="bg-muted/50">
                   <TableRow>
                     <TableHead className="w-[80px]">Imagen</TableHead>
-                    <TableHead className="min-w-[180px]">Producto</TableHead>
-                    <TableHead className="w-[180px]">Precio ($)</TableHead>
-                    <TableHead className="w-[140px]">Stock (u.)</TableHead>
-                    <TableHead className="min-w-[300px]">URL Imagen</TableHead>
+                    <TableHead className="min-w-[150px]">Nombre</TableHead>
+                    <TableHead className="w-[160px]">SKU / Código</TableHead>
+                    <TableHead className="w-[140px]">Precio ($)</TableHead>
+                    <TableHead className="w-[120px]">Stock (u.)</TableHead>
+                    <TableHead className="min-w-[250px]">URL Imagen</TableHead>
                     <TableHead className="text-right">Acción</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {isLoading ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="h-64 text-center">
+                      <TableCell colSpan={7} className="h-64 text-center">
                         <Loader2 className="h-10 w-10 animate-spin mx-auto text-primary" />
                         <p className="mt-2 text-muted-foreground font-medium">Cargando catálogo...</p>
                       </TableCell>
@@ -215,8 +218,19 @@ export default function BulkEditPage() {
                         </TableCell>
                         <TableCell>
                           <div className="flex flex-col">
-                            <span className="font-bold text-sm leading-tight truncate max-w-[160px]">{p.name}</span>
-                            <span className="text-[10px] font-mono text-muted-foreground uppercase">{p.sku || 'SIN SKU'}</span>
+                            <span className="font-bold text-sm leading-tight truncate max-w-[140px]">{p.name}</span>
+                            <span className="text-[9px] font-black uppercase text-muted-foreground tracking-tighter">{p.category || 'General'}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="relative">
+                            <Barcode className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+                            <Input 
+                              className={`pl-7 h-9 text-xs font-mono uppercase w-full ${isDirty && changes.sku !== undefined ? 'border-accent ring-1 ring-accent bg-accent/5' : ''}`}
+                              value={changes.sku ?? p.sku ?? ""}
+                              placeholder="Sin Código"
+                              onChange={(e) => handleLocalChange(p.id, 'sku', e.target.value)}
+                            />
                           </div>
                         </TableCell>
                         <TableCell>
@@ -269,10 +283,10 @@ export default function BulkEditPage() {
                   })}
                   {!isLoading && filteredProducts.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={6} className="h-64 text-center opacity-40">
+                      <TableCell colSpan={7} className="h-64 text-center opacity-40">
                         <div className="flex flex-col items-center gap-3">
                           <Search className="h-12 w-12" />
-                          <p className="font-bold text-lg">No se encontraron coincidencias</p>
+                          <p className="font-bold text-lg">No se encontraron productos</p>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -292,7 +306,7 @@ export default function BulkEditPage() {
                    <span className="font-black text-sm uppercase tracking-wider">
                      {Object.keys(localChanges).length} cambios pendientes
                    </span>
-                   <span className="text-[10px] opacity-70">Los cambios no se aplicarán hasta que guardes.</span>
+                   <span className="text-[10px] opacity-70">Haz clic en Guardar para aplicar a la base de datos.</span>
                  </div>
                </div>
                <div className="flex gap-3 w-full sm:w-auto">
