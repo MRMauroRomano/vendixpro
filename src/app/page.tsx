@@ -13,8 +13,7 @@ import {
   Loader2,
   Database,
   CheckCircle2,
-  RefreshCcw,
-  Trash2
+  RefreshCcw
 } from "lucide-react";
 import { 
   BarChart, 
@@ -171,13 +170,11 @@ export default function DashboardPage() {
     setIsClearing(true);
 
     try {
-      // Borrar ventas
       const salesSnapshot = await getDocs(collection(firestore, "users", user.uid, "sales"));
       salesSnapshot.forEach((sDoc) => {
         deleteDocumentNonBlocking(doc(firestore, "users", user.uid, "sales", sDoc.id));
       });
 
-      // Borrar gastos
       const expensesSnapshot = await getDocs(collection(firestore, "users", user.uid, "expenses"));
       expensesSnapshot.forEach((eDoc) => {
         deleteDocumentNonBlocking(doc(firestore, "users", user.uid, "expenses", eDoc.id));

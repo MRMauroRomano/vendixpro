@@ -43,7 +43,6 @@ export default function ExpensesPage() {
   const { toast } = useToast();
   const [isAddOpen, setIsAddOpen] = useState(false);
 
-  // VALIDACIÓN DE CAJA ABIERTA
   const activeSessionQuery = useMemoFirebase(() => {
     if (!firestore || !user?.uid) return null;
     return query(
@@ -56,13 +55,11 @@ export default function ExpensesPage() {
   const { data: activeSessions, isLoading: isSessionLoading } = useCollection(activeSessionQuery);
   const isCashOpen = activeSessions && activeSessions.length > 0;
 
-  // Referencia base para escrituras
   const baseExpensesRef = useMemoFirebase(() => {
     if (!firestore || !user?.uid) return null;
     return collection(firestore, "users", user.uid, "expenses");
   }, [firestore, user?.uid]);
 
-  // Consulta para lecturas ordenadas
   const expensesQuery = useMemoFirebase(() => {
     if (!baseExpensesRef) return null;
     return query(baseExpensesRef, orderBy("date", "desc"));
