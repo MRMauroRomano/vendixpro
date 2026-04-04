@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { AppLayout } from "@/components/layout/app-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,7 +24,8 @@ import {
   Filter,
   GlassWater,
   Star,
-  Layers
+  Layers,
+  Barcode
 } from "lucide-react";
 import { 
   useCollection, 
@@ -67,6 +68,7 @@ export default function POSContent() {
   const { toast } = useToast();
   const searchParams = useSearchParams();
   const categoryParam = searchParams.get("category");
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -126,23 +128,6 @@ export default function POSContent() {
   const categories = categoriesData || [];
   const customers = customersData || [];
 
-  // OPTIMIZACIÓN: Filtrado eficiente con límite de renderizado
-  const filteredProducts = useMemo(() => {
-    const term = searchTerm.toLowerCase();
-    const matches = products.filter(p => {
-      const matchesSearch = !term || 
-                          String(p.name || "").toLowerCase().includes(term) ||
-                          String(p.sku || "").toLowerCase().includes(term) ||
-                          String(p.variant || "").toLowerCase().includes(term);
-      
-      const matchesCategory = !selectedCategoryFilter || p.category === selectedCategoryFilter;
-      
-      return matchesSearch && matchesCategory;
-    });
-    // Limitamos a los primeros 60 resultados para evitar lag de renderizado masivo
-    return matches.slice(0, 60);
-  }, [products, searchTerm, selectedCategoryFilter]);
-
   const addToCart = useCallback((product: any, overridePrice?: number) => {
     if (product.isVariablePrice && overridePrice === undefined) {
       setVariableProductDialog(product);
@@ -168,7 +153,40 @@ export default function POSContent() {
       }
       return [...prev, { product: productToAdd, quantity: 1 }];
     });
+
+    // Mantener el foco en el buscador para el siguiente escaneo
+    setTimeout(() => searchInputRef.current?.focus(), 50);
   }, []);
+
+  // Lógica de escaneo automático (Supermercado)
+  useEffect(() => {
+    if (!searchTerm || searchTerm.length < 3) return;
+
+    // Buscar coincidencia exacta por SKU
+    const exactMatch = products.find(p => 
+      p.sku && p.sku.trim().toLowerCase() === searchTerm.trim().toLowerCase()
+    );
+
+    if (exactMatch) {
+      addToCart(exactMatch);
+      setSearchTerm(""); // Limpiar para el próximo escaneo
+    }
+  }, [searchTerm, products, addToCart]);
+
+  const filteredProducts = useMemo(() => {
+    const term = searchTerm.toLowerCase();
+    const matches = products.filter(p => {
+      const matchesSearch = !term || 
+                          String(p.name || "").toLowerCase().includes(term) ||
+                          String(p.sku || "").toLowerCase().includes(term) ||
+                          String(p.variant || "").toLowerCase().includes(term);
+      
+      const matchesCategory = !selectedCategoryFilter || p.category === selectedCategoryFilter;
+      
+      return matchesSearch && matchesCategory;
+    });
+    return matches.slice(0, 40); // Límite de renderizado para máxima velocidad
+  }, [products, searchTerm, selectedCategoryFilter]);
 
   const handleAddVariablePriceProduct = () => {
     if (variableProductDialog) {
@@ -255,7 +273,6 @@ export default function POSContent() {
     
     try {
       const saleRef = await addDoc(salesRef, saleData);
-      
       const saleItemsRef = collection(firestore, "users", user.uid, "sales", saleRef.id, "sale_items");
       
       cart.forEach(item => {
@@ -310,6 +327,7 @@ export default function POSContent() {
       setCart([]);
       setIsPaymentDialogOpen(false);
       resetPayment();
+      setTimeout(() => searchInputRef.current?.focus(), 100);
     } catch (error) {
       toast({ variant: "destructive", title: "Error al registrar venta" });
     }
@@ -324,7 +342,7 @@ export default function POSContent() {
           </div>
           <h1 className="text-3xl font-black text-primary uppercase tracking-tight">Caja Cerrada</h1>
           <p className="text-muted-foreground">
-            Para realizar ventas, primero debes iniciar un turno en el sistema. Esto asegura que el arqueo de dinero sea correcto.
+            Para realizar ventas, primero debes iniciar un turno en el sistema.
           </p>
           <Button asChild size="lg" className="font-bold h-14 px-8">
             <Link href="/cash">Abrir Caja Ahora</Link>
@@ -341,12 +359,14 @@ export default function POSContent() {
           <div className="flex flex-col gap-4 shrink-0">
             <div className="flex gap-2">
               <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Barcode className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-accent animate-pulse" />
                 <Input 
-                  placeholder="Buscar productos (nombre, SKU o variante)..." 
-                  className="pl-10 h-12 text-base shadow-sm bg-white"
+                  ref={searchInputRef}
+                  placeholder="Escanee código o busque producto..." 
+                  className="pl-11 h-12 text-base shadow-sm border-2 border-primary/20 focus:border-accent bg-white"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
+                  autoFocus
                 />
               </div>
               
@@ -434,7 +454,7 @@ export default function POSContent() {
             ) : filteredProducts.map(product => (
               <Card 
                 key={product.id} 
-                className={`cursor-pointer hover:shadow-xl transition-all border-2 group overflow-hidden bg-card flex flex-col h-fit min-h-[280px] ${product.isVariablePrice ? 'border-dashed border-accent/40' : ''} ${product.category === 'Promos' ? 'border-accent/40 shadow-sm' : ''}`}
+                className={`cursor-pointer hover:shadow-xl transition-all border-2 group overflow-hidden bg-card flex flex-col h-fit min-h-[260px] ${product.isVariablePrice ? 'border-dashed border-accent/40' : ''} ${product.category === 'Promos' ? 'border-accent/40 shadow-sm' : ''}`}
                 onClick={() => addToCart(product)}
               >
                 <div className="relative aspect-video w-full overflow-hidden bg-muted border-b shrink-0">
@@ -448,17 +468,6 @@ export default function POSContent() {
                     <Badge className={`shadow-md font-bold ${(product.stockQuantity || 0) <= 5 ? 'bg-red-500' : 'bg-primary'}`}>
                       {product.stockQuantity || 0} u.
                     </Badge>
-                    {product.variant && (
-                      <Badge variant="secondary" className="bg-accent text-accent-foreground font-black text-[9px] uppercase h-5 px-1.5 shadow-sm">
-                        {product.variant}
-                      </Badge>
-                    )}
-                    {product.category === 'Promos' && (
-                      <Badge className="bg-accent text-accent-foreground font-black gap-1 shadow-md">
-                        <Star className="h-3 w-3 fill-current" />
-                        PROMO
-                      </Badge>
-                    )}
                   </div>
                 </div>
                 <CardContent className="p-4 space-y-2 flex-1 flex flex-col">
@@ -466,40 +475,28 @@ export default function POSContent() {
                     <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">
                       {product.category || "General"}
                     </span>
-                    <span className="text-[9px] font-mono text-muted-foreground bg-muted px-1 rounded shrink-0">
-                      {product.sku}
-                    </span>
                   </div>
                   <h3 className="font-bold text-sm line-clamp-2 leading-tight h-10">
-                    {product.name}
+                    {product.name} {product.variant && <span className="text-accent">({product.variant})</span>}
                   </h3>
                   <div className="text-xl font-black text-primary mt-auto pt-2">
-                    {product.isVariablePrice ? "Definir Precio" : `$${(product.price || 0).toLocaleString()}`}
+                    {product.isVariablePrice ? "Precio Variable" : `$${(product.price || 0).toLocaleString()}`}
                   </div>
                 </CardContent>
               </Card>
             ))}
-            {!isProductsLoading && filteredProducts.length === 0 && (
-              <div className="col-span-full py-20 text-center text-muted-foreground">
-                <div className="flex flex-col items-center gap-2">
-                  <Filter className="h-10 w-10 opacity-20" />
-                  <p className="font-bold">No se encontraron productos</p>
-                  <p className="text-xs">Prueba con otro filtro o término de búsqueda.</p>
-                </div>
-              </div>
-            )}
           </div>
         </div>
 
         <Card className="lg:col-span-4 flex flex-col shadow-2xl overflow-hidden border-l-2 h-full bg-card max-w-[400px]">
           <CardHeader className="py-4 px-6 border-b bg-muted/20 shrink-0">
             <div className="flex justify-between items-center">
-              <CardTitle className="text-base flex items-center gap-2">
+              <CardTitle className="text-base flex items-center gap-2 font-black uppercase tracking-tighter">
                 <ShoppingBag className="h-4 w-4 text-primary" />
-                Pedido Actual
+                Venta Actual
               </CardTitle>
               <Button variant="ghost" size="sm" onClick={() => setCart([])} className="text-muted-foreground hover:text-red-500 text-[10px] h-7" disabled={cart.length === 0}>
-                Limpiar
+                VACIAR
               </Button>
             </div>
           </CardHeader>
@@ -507,39 +504,31 @@ export default function POSContent() {
           <CardContent className="flex-1 overflow-y-auto p-0">
             {cart.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-8 text-center space-y-4 opacity-30">
-                <ShoppingBag className="h-10 w-10" />
-                <p className="text-xs font-medium italic">Seleccione productos para iniciar</p>
+                <Barcode className="h-12 w-12" />
+                <p className="text-sm font-black uppercase tracking-widest">Escanee un producto</p>
               </div>
             ) : (
               <div className="divide-y divide-border/50">
                 {cart.map((item, index) => (
                   <div key={`${item.product.id}-${index}`} className="p-3 flex gap-3 items-center group hover:bg-muted/10 transition-colors">
-                    <div className="h-10 w-10 rounded border overflow-hidden bg-muted flex-shrink-0 flex items-center justify-center">
-                       <img src={item.product.imageUrl || `https://picsum.photos/seed/${item.product.id}/100/100`} alt="" className="h-full w-full object-cover" />
-                    </div>
                     <div className="flex-1 min-w-0">
                       <div className="font-bold text-xs truncate">
                         {item.product.name}
-                        {item.product.variant && <span className="ml-1 text-[9px] opacity-60">({item.product.variant})</span>}
+                        {item.product.variant && <span className="ml-1 text-[9px] text-accent">({item.product.variant})</span>}
                       </div>
-                      <div className="text-[10px] text-muted-foreground">${(item.product.price || 0).toLocaleString()} c/u</div>
+                      <div className="text-[10px] text-muted-foreground font-mono">${(item.product.price || 0).toLocaleString()} x {item.quantity}</div>
                     </div>
                     <div className="flex flex-col items-end gap-1">
                       <div className="flex items-center gap-1.5 bg-muted/50 rounded p-0.5 border">
                         <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => updateQuantity(item.product.id, -1, item.product.price)}>
                           <Minus className="h-2.5 w-2.5" />
                         </Button>
-                        <span className="w-4 text-center text-xs font-bold">{item.quantity}</span>
+                        <span className="w-5 text-center text-xs font-black">{item.quantity}</span>
                         <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => updateQuantity(item.product.id, 1, item.product.price)}>
                           <Plus className="h-2.5 w-2.5" />
                         </Button>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-xs text-primary">${((item.product.price || 0) * item.quantity).toLocaleString()}</span>
-                        <Button variant="ghost" size="icon" className="h-5 w-5 hover:text-red-500" onClick={() => removeFromCart(item.product.id, item.product.price)}>
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
+                      <span className="font-black text-xs text-primary">${((item.product.price || 0) * item.quantity).toLocaleString()}</span>
                     </div>
                   </div>
                 ))}
@@ -548,21 +537,21 @@ export default function POSContent() {
           </CardContent>
           
           <CardFooter className="flex-col p-5 border-t bg-primary/5 gap-3 shrink-0">
-            <div className="w-full flex justify-between items-center">
-              <span className="text-xs font-bold text-muted-foreground uppercase">Total</span>
-              <span className="text-2xl font-black text-primary">${total.toLocaleString()}</span>
+            <div className="w-full flex justify-between items-center mb-2">
+              <span className="text-sm font-black text-muted-foreground uppercase tracking-widest">Total</span>
+              <span className="text-3xl font-black text-primary">${total.toLocaleString()}</span>
             </div>
             
             <Dialog open={isPaymentDialogOpen} onOpenChange={(open) => { setIsPaymentDialogOpen(open); if(!open) resetPayment(); }}>
               <DialogTrigger asChild>
-                <Button className="w-full h-12 text-base font-black gap-2 shadow-lg" disabled={cart.length === 0}>
-                  PAGAR
-                  <ChevronRight className="h-4 w-4" />
+                <Button className="w-full h-14 text-lg font-black gap-2 shadow-lg bg-accent text-accent-foreground hover:bg-accent/90" disabled={cart.length === 0}>
+                  COBRAR VENTA
+                  <ChevronRight className="h-5 w-5" />
                 </Button>
               </DialogTrigger>
               <DialogContent className="sm:max-w-[450px]">
                 <DialogHeader>
-                  <DialogTitle className="text-xl font-bold">Total a Cobrar: ${total.toLocaleString()}</DialogTitle>
+                  <DialogTitle className="text-xl font-bold">Resumen de Pago</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-5 py-3">
                   <div className="grid grid-cols-4 gap-2">
@@ -590,15 +579,16 @@ export default function POSContent() {
                         <label className="text-xs font-bold">Monto Recibido</label>
                         <Input 
                           type="number" 
-                          className="text-xl font-bold h-12"
+                          className="text-2xl font-black h-14"
                           placeholder="0.00"
                           value={cashReceived || ""}
                           onChange={(e) => setCashReceived(Number(e.target.value))}
+                          autoFocus
                         />
                       </div>
                       <div className="flex justify-between items-center p-3 bg-background rounded border">
-                        <span className="text-sm font-medium">Vuelto:</span>
-                        <span className={`text-2xl font-black ${changeDue > 0 ? 'text-accent' : 'text-muted-foreground'}`}>
+                        <span className="text-sm font-black uppercase">Vuelto:</span>
+                        <span className={`text-3xl font-black ${changeDue > 0 ? 'text-accent' : 'text-muted-foreground'}`}>
                           ${changeDue.toLocaleString()}
                         </span>
                       </div>
@@ -624,9 +614,9 @@ export default function POSContent() {
                   )}
                 </div>
                 <DialogFooter className="sm:justify-between gap-3 mt-2">
-                  <Button variant="outline" onClick={() => setIsPaymentDialogOpen(false)} className="flex-1 h-11">Cancelar</Button>
-                  <Button className="flex-1 h-11 text-base font-bold gap-2" disabled={!paymentMethod || (paymentMethod === "Cuenta Corriente" && !selectedCustomerId)} onClick={handleCompleteSale}>
-                    Confirmar
+                  <Button variant="outline" onClick={() => setIsPaymentDialogOpen(false)} className="flex-1 h-12 font-bold">Cancelar</Button>
+                  <Button className="flex-1 h-12 text-base font-black gap-2" disabled={!paymentMethod || (paymentMethod === "Cuenta Corriente" && !selectedCustomerId)} onClick={handleCompleteSale}>
+                    Confirmar Venta
                   </Button>
                 </DialogFooter>
               </DialogContent>
