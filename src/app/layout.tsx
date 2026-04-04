@@ -1,11 +1,12 @@
+
 import type {Metadata} from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { FirebaseClientProvider } from '@/firebase/client-provider';
 
 export const metadata: Metadata = {
-  title: 'VENDIXPRO - Punto de Venta Profesional',
-  description: 'Gestión inteligente de stock, ventas y finanzas.',
+  title: 'Almacén El Gringo - Punto de Venta Profesional',
+  description: 'Gestión inteligente de stock, ventas y finanzas para Almacén El Gringo.',
 };
 
 export default function RootLayout({

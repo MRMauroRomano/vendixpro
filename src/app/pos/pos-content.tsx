@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { AppLayout } from "@/components/layout/app-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -126,10 +126,12 @@ export default function POSContent() {
   const categories = categoriesData || [];
   const customers = customersData || [];
 
+  // OPTIMIZACIÓN: Filtrado eficiente con límite de renderizado
   const filteredProducts = useMemo(() => {
     const term = searchTerm.toLowerCase();
-    return products.filter(p => {
-      const matchesSearch = String(p.name || "").toLowerCase().includes(term) ||
+    const matches = products.filter(p => {
+      const matchesSearch = !term || 
+                          String(p.name || "").toLowerCase().includes(term) ||
                           String(p.sku || "").toLowerCase().includes(term) ||
                           String(p.variant || "").toLowerCase().includes(term);
       
@@ -137,9 +139,11 @@ export default function POSContent() {
       
       return matchesSearch && matchesCategory;
     });
+    // Limitamos a los primeros 60 resultados para evitar lag de renderizado masivo
+    return matches.slice(0, 60);
   }, [products, searchTerm, selectedCategoryFilter]);
 
-  const addToCart = (product: any, overridePrice?: number) => {
+  const addToCart = useCallback((product: any, overridePrice?: number) => {
     if (product.isVariablePrice && overridePrice === undefined) {
       setVariableProductDialog(product);
       setTempVariablePrice(product.price || 0);
@@ -164,7 +168,7 @@ export default function POSContent() {
       }
       return [...prev, { product: productToAdd, quantity: 1 }];
     });
-  };
+  }, []);
 
   const handleAddVariablePriceProduct = () => {
     if (variableProductDialog) {
@@ -207,7 +211,7 @@ export default function POSContent() {
     }));
   };
 
-  const total = cart.reduce((acc, item) => acc + ((item.product.price || 0) * item.quantity), 0);
+  const total = useMemo(() => cart.reduce((acc, item) => acc + ((item.product.price || 0) * item.quantity), 0), [cart]);
   const changeDue = Math.max(0, cashReceived - total);
 
   const resetPayment = () => {
@@ -264,13 +268,10 @@ export default function POSContent() {
           subtotal: (item.product.price || 0) * item.quantity,
         });
 
-        // Lógica de Descuento de Stock
         if (!item.product.isCustom) {
-          // Si es una PROMO con componentes definidos (Receta)
           if (item.product.category === "Promos" && item.product.bundleItems && item.product.bundleItems.length > 0) {
             item.product.bundleItems.forEach((bundleItem: any) => {
               const componentDocRef = doc(firestore, "users", user.uid, "products", bundleItem.productId);
-              // Buscamos el producto en la lista local para obtener su stock actual
               const originalProduct = products.find(p => p.id === bundleItem.productId);
               if (originalProduct) {
                 const totalDeduction = bundleItem.quantity * item.quantity;
@@ -279,13 +280,11 @@ export default function POSContent() {
                 });
               }
             });
-            // También descontamos el stock de la promo misma si tiene stock propio cargado
             const promoDocRef = doc(firestore, "users", user.uid, "products", item.product.id);
             updateDocumentNonBlocking(promoDocRef, {
               stockQuantity: Math.max(0, (item.product.stockQuantity || 0) - item.quantity)
             });
           } else {
-            // Producto estándar
             const productDocRef = doc(firestore, "users", user.uid, "products", item.product.id);
             const currentProduct = products.find(p => p.id === item.product.id);
             if (currentProduct) {
@@ -316,7 +315,7 @@ export default function POSContent() {
     }
   };
 
-  if (!isCashOpen) {
+  if (!isCashOpen && !isSessionLoading) {
     return (
       <AppLayout>
         <div className="flex flex-col items-center justify-center min-h-[70vh] space-y-6 text-center max-w-lg mx-auto">
@@ -442,6 +441,7 @@ export default function POSContent() {
                    <img 
                     src={product.imageUrl || `https://picsum.photos/seed/${product.id}/400/300`} 
                     alt={product.name}
+                    loading="lazy"
                     className="h-full w-full object-cover transition-transform group-hover:scale-105"
                   />
                   <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">
@@ -457,18 +457,6 @@ export default function POSContent() {
                       <Badge className="bg-accent text-accent-foreground font-black gap-1 shadow-md">
                         <Star className="h-3 w-3 fill-current" />
                         PROMO
-                      </Badge>
-                    )}
-                    {product.isVariablePrice && (
-                      <Badge variant="secondary" className="bg-white/90 text-accent font-black gap-1">
-                        <Scale className="h-3 w-3" />
-                        VARIABLE
-                      </Badge>
-                    )}
-                    {product.bundleItems && product.bundleItems.length > 0 && (
-                      <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 font-black text-[8px] gap-1">
-                        <Layers className="h-2 w-2" />
-                        COMBO
                       </Badge>
                     )}
                   </div>
@@ -535,9 +523,6 @@ export default function POSContent() {
                         {item.product.variant && <span className="ml-1 text-[9px] opacity-60">({item.product.variant})</span>}
                       </div>
                       <div className="text-[10px] text-muted-foreground">${(item.product.price || 0).toLocaleString()} c/u</div>
-                      {item.product.bundleItems && item.product.bundleItems.length > 0 && (
-                        <div className="text-[8px] text-accent font-black uppercase">Combo: {item.product.bundleItems.map((bi: any) => bi.productName).join(', ')}</div>
-                      )}
                     </div>
                     <div className="flex flex-col items-end gap-1">
                       <div className="flex items-center gap-1.5 bg-muted/50 rounded p-0.5 border">
@@ -635,7 +620,6 @@ export default function POSContent() {
                           ))}
                         </SelectContent>
                       </Select>
-                      <p className="text-[10px] text-muted-foreground mt-1">El monto de la venta se sumará a la deuda del cliente.</p>
                     </div>
                   )}
                 </div>

@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -30,7 +31,6 @@ export default function AuthPage() {
   const { toast } = useToast();
   const { user, isUserLoading } = useUser();
 
-  // Efecto para redirigir si el usuario ya está autenticado
   useEffect(() => {
     if (!isUserLoading && user && !user.isAnonymous) {
       router.push("/");
@@ -54,13 +54,12 @@ export default function AuthPage() {
         }
         toast({
           title: "Cuenta creada",
-          description: "Bienvenido a VENDIXPRO. Tu cuenta ha sido registrada con éxito.",
+          description: "Bienvenido a ALMACÉN EL GRINGO.",
         });
       } else {
         await signInWithEmailAndPassword(auth, email, password);
         toast({
           title: "Sesión iniciada",
-          description: "Has ingresado correctamente al sistema.",
         });
       }
       router.push("/");
@@ -68,7 +67,7 @@ export default function AuthPage() {
       toast({
         variant: "destructive",
         title: "Error de autenticación",
-        description: error.message || "Hubo un problema al procesar tu solicitud.",
+        description: error.message,
       });
     } finally {
       setIsLoading(false);
@@ -85,7 +84,6 @@ export default function AuthPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4 relative overflow-hidden">
-      {/* Círculos decorativos de fondo */}
       <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/5 rounded-full blur-3xl" />
       <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-accent/10 rounded-full blur-3xl" />
 
@@ -94,26 +92,26 @@ export default function AuthPage() {
           <div className="bg-primary p-3 rounded-2xl shadow-lg mb-4">
             <ShoppingBag className="h-10 w-10 text-accent" />
           </div>
-          <h1 className="text-3xl font-bold tracking-tight font-headline">
-            VENDIX<span className="text-accent">PRO</span>
+          <h1 className="text-3xl font-black tracking-tighter font-headline uppercase">
+            ALMACÉN <span className="text-accent">EL GRINGO</span>
           </h1>
-          <p className="text-muted-foreground text-center mt-2">
-            Punto de Venta Profesional para tu Negocio
+          <p className="text-muted-foreground text-center mt-2 font-medium">
+            Sistema de Gestión y Punto de Venta
           </p>
         </div>
 
         <Tabs defaultValue="login" className="w-full">
           <TabsList className="grid w-full grid-cols-2 mb-6 h-12">
-            <TabsTrigger value="login" className="text-sm font-semibold">Iniciar Sesión</TabsTrigger>
-            <TabsTrigger value="register" className="text-sm font-semibold">Registrarse</TabsTrigger>
+            <TabsTrigger value="login" className="text-sm font-black uppercase">Ingresar</TabsTrigger>
+            <TabsTrigger value="register" className="text-sm font-black uppercase">Registrar</TabsTrigger>
           </TabsList>
 
           <TabsContent value="login">
             <Card className="border-2 shadow-xl">
               <CardHeader>
-                <CardTitle>Bienvenido de nuevo</CardTitle>
+                <CardTitle>Bienvenido</CardTitle>
                 <CardDescription>
-                  Ingresa tus credenciales para acceder a tu panel de control.
+                  Ingresa tus credenciales para acceder al sistema.
                 </CardDescription>
               </CardHeader>
               <form onSubmit={(e) => handleAuth(e, "login")}>
@@ -122,15 +120,12 @@ export default function AuthPage() {
                     <Label htmlFor="email-login">Correo Electrónico</Label>
                     <div className="relative">
                       <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input id="email-login" name="email" type="email" placeholder="ejemplo@vendix.pro" className="pl-10" required />
+                      <Input id="email-login" name="email" type="email" placeholder="admin@elgringo.pro" className="pl-10" required />
                     </div>
                   </div>
                   <div className="space-y-2">
                     <div className="flex justify-between items-center">
                       <Label htmlFor="password-login">Contraseña</Label>
-                      <Button variant="link" size="sm" className="px-0 font-normal text-xs">
-                        ¿Olvidaste tu contraseña?
-                      </Button>
                     </div>
                     <div className="relative">
                       <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -139,8 +134,8 @@ export default function AuthPage() {
                   </div>
                 </CardContent>
                 <CardFooter>
-                  <Button className="w-full h-11 text-base font-bold gap-2" type="submit" disabled={isLoading}>
-                    {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : "Entrar al Sistema"}
+                  <Button className="w-full h-11 text-base font-black gap-2" type="submit" disabled={isLoading}>
+                    {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : "ACCEDER AL PANEL"}
                     {!isLoading && <ArrowRight className="h-5 w-5" />}
                   </Button>
                 </CardFooter>
@@ -151,25 +146,25 @@ export default function AuthPage() {
           <TabsContent value="register">
             <Card className="border-2 shadow-xl">
               <CardHeader>
-                <CardTitle>Crear una cuenta</CardTitle>
+                <CardTitle>Nueva Cuenta</CardTitle>
                 <CardDescription>
-                  Regístrate hoy y empieza a gestionar tu negocio de forma inteligente.
+                  Regístrate para empezar a gestionar tu almacén.
                 </CardDescription>
               </CardHeader>
               <form onSubmit={(e) => handleAuth(e, "register")}>
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="name-reg">Nombre Completo / Negocio</Label>
+                    <Label htmlFor="name-reg">Nombre / Razón Social</Label>
                     <div className="relative">
                       <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input id="name-reg" name="name" placeholder="Juan Pérez" className="pl-10" required />
+                      <Input id="name-reg" name="name" placeholder="Almacén El Gringo" className="pl-10" required />
                     </div>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="email-reg">Correo Electrónico</Label>
                     <div className="relative">
                       <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input id="email-reg" name="email" type="email" placeholder="ejemplo@vendix.pro" className="pl-10" required />
+                      <Input id="email-reg" name="email" type="email" placeholder="info@elgringo.pro" className="pl-10" required />
                     </div>
                   </div>
                   <div className="space-y-2">
@@ -178,25 +173,17 @@ export default function AuthPage() {
                       <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                       <Input id="password-reg" name="password" type="password" placeholder="••••••••" className="pl-10" required />
                     </div>
-                    <p className="text-[10px] text-muted-foreground mt-1">
-                      Mínimo 6 caracteres alfanuméricos recomendados.
-                    </p>
                   </div>
                 </CardContent>
                 <CardFooter>
-                  <Button className="w-full h-11 text-base font-bold gap-2" type="submit" disabled={isLoading}>
-                    {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : "Crear mi Cuenta"}
-                    {!isLoading && <User className="h-5 w-5" />}
+                  <Button className="w-full h-11 text-base font-black gap-2" type="submit" disabled={isLoading}>
+                    {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : "CREAR CUENTA"}
                   </Button>
                 </CardFooter>
               </form>
             </Card>
           </TabsContent>
         </Tabs>
-
-        <p className="text-center text-xs text-muted-foreground mt-8">
-          Al continuar, aceptas nuestros <Button variant="link" className="h-auto p-0 text-xs">Términos de Servicio</Button> y <Button variant="link" className="h-auto p-0 text-xs">Política de Privacidad</Button>.
-        </p>
       </div>
     </div>
   );

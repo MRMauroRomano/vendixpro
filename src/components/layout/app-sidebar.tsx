@@ -18,12 +18,11 @@ import {
   ChevronRight,
   AlertTriangle,
   Tags,
-  Layers,
   TableProperties,
   Unlock,
-  Lock,
   GlassWater,
-  Star
+  Star,
+  Layers
 } from "lucide-react";
 import {
   Sidebar,
@@ -96,14 +95,12 @@ export function AppSidebar() {
       await signOut(auth);
       toast({
         title: "Sesión cerrada",
-        description: "Has salido del sistema correctamente.",
       });
       router.push("/auth");
     } catch (error) {
       toast({
         variant: "destructive",
         title: "Error al cerrar sesión",
-        description: "No se pudo cerrar la sesión. Intenta de nuevo.",
       });
     }
   };
@@ -111,9 +108,9 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader className="h-16 flex items-center px-6">
-        <Link href="/" className="flex items-center gap-2 font-bold text-xl group-data-[collapsible=icon]:justify-center">
+        <Link href="/" className="flex items-center gap-2 font-black text-xl group-data-[collapsible=icon]:justify-center">
           <ShoppingBag className="h-8 w-8 text-accent shrink-0" />
-          <span className="group-data-[collapsible=icon]:hidden">VENDIX<span className="text-accent">PRO</span></span>
+          <span className="group-data-[collapsible=icon]:hidden tracking-tighter uppercase">ALMACÉN <span className="text-accent">EL GRINGO</span></span>
         </Link>
       </SidebarHeader>
       <SidebarSeparator className="opacity-10" />
@@ -138,7 +135,7 @@ export function AppSidebar() {
                     <CollapsibleTrigger asChild>
                       <SidebarMenuButton tooltip={item.label} className="py-6">
                         <item.icon className="h-5 w-5" />
-                        <span className="font-medium">{item.label}</span>
+                        <span className="font-bold">{item.label}</span>
                         <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
                       </SidebarMenuButton>
                     </CollapsibleTrigger>
@@ -149,7 +146,7 @@ export function AppSidebar() {
                             <SidebarMenuSubButton asChild isActive={pathname === subItem.href.split('?')[0]}>
                               <Link href={subItem.href} className="flex items-center gap-2">
                                 <subItem.icon className="h-4 w-4 opacity-70" />
-                                <span>{subItem.label}</span>
+                                <span className="text-xs font-semibold">{subItem.label}</span>
                               </Link>
                             </SidebarMenuSubButton>
                           </SidebarMenuSubItem>
@@ -171,7 +168,7 @@ export function AppSidebar() {
                 >
                   <Link href={item.href}>
                     <item.icon className="h-5 w-5" />
-                    <span className="font-medium">{item.label}</span>
+                    <span className="font-bold">{item.label}</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -181,12 +178,12 @@ export function AppSidebar() {
       </SidebarContent>
       <SidebarFooter className="p-4 space-y-2">
         {user && !user.isAnonymous && (
-          <div className="px-2 py-2 mb-2 bg-accent/10 rounded-lg group-data-[collapsible=icon]:hidden">
+          <div className="px-2 py-2 mb-2 bg-accent/10 rounded-lg group-data-[collapsible=icon]:hidden border border-accent/20">
             <div className="flex items-center gap-2">
               <UserCircle className="h-8 w-8 text-accent" />
               <div className="flex flex-col overflow-hidden">
-                <span className="text-xs font-bold truncate">{user.displayName || "Usuario"}</span>
-                <span className="text-[10px] opacity-70 truncate">{user.email}</span>
+                <span className="text-xs font-black truncate uppercase tracking-tighter">{user.displayName || "Admin El Gringo"}</span>
+                <span className="text-[9px] opacity-70 truncate">{user.email}</span>
               </div>
             </div>
           </div>
@@ -201,7 +198,7 @@ export function AppSidebar() {
                 tooltip="Cerrar Sesión"
               >
                 <LogOut className="h-5 w-5" />
-                <span>Cerrar Sesión</span>
+                <span className="font-bold">Salir</span>
               </SidebarMenuButton>
             ) : (
               <SidebarMenuButton 
@@ -211,7 +208,7 @@ export function AppSidebar() {
               >
                 <Link href="/auth">
                   <UserCircle className="h-5 w-5" />
-                  <span>Iniciar Sesión</span>
+                  <span className="font-bold">Ingresar</span>
                 </Link>
               </SidebarMenuButton>
             )}

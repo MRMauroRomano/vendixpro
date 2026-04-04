@@ -149,18 +149,9 @@ export default function DashboardPage() {
       createdAt: new Date().toISOString()
     });
 
-    const expRef = collection(firestore, "users", user.uid, "expenses");
-    addDocumentNonBlocking(expRef, {
-      concept: "Insumos Iniciales",
-      category: "Limpieza",
-      amount: 500,
-      date: new Date().toISOString().split('T')[0],
-      createdAt: new Date().toISOString()
-    });
-
     toast({
       title: "Carga Iniciada",
-      description: "Los datos de prueba se están sincronizando con el servidor.",
+      description: "Los datos de prueba se están sincronizando.",
     });
     setIsSeeding(false);
   };
@@ -182,13 +173,12 @@ export default function DashboardPage() {
 
       toast({
         title: "Historial Reiniciado",
-        description: "Se han eliminado todas las ventas y gastos. Los contadores volverán a 0.",
+        description: "Se han eliminado todas las ventas y gastos.",
       });
     } catch (error) {
       toast({
         variant: "destructive",
         title: "Error al reiniciar",
-        description: "Hubo un problema al intentar borrar los datos.",
       });
     } finally {
       setIsClearing(false);
@@ -210,8 +200,8 @@ export default function DashboardPage() {
       <div className="space-y-8">
         <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold font-headline">Dashboard de Rendimiento</h1>
-            <p className="text-muted-foreground italic">Kiosco el Tula - Panel de Control</p>
+            <h1 className="text-3xl font-bold font-headline uppercase tracking-tighter">Panel de Gestión</h1>
+            <p className="text-muted-foreground italic font-semibold text-accent">Almacén El Gringo</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <AlertDialog>
@@ -223,7 +213,7 @@ export default function DashboardPage() {
                   disabled={isClearing}
                 >
                   {isClearing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
-                  Reiniciar Contadores
+                  Reiniciar Historial
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
@@ -250,8 +240,8 @@ export default function DashboardPage() {
               onClick={handleSeedData}
               disabled={isSeeding}
             >
-              {isSeeding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Database className="h-4 w-4" />}
-              {isSeeding ? "Cargando..." : "Cargar Datos Prueba"}
+              <Database className="h-4 w-4" />
+              Cargar Demo
             </Button>
           </div>
         </div>
@@ -276,7 +266,7 @@ export default function DashboardPage() {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
           <Card className="col-span-4 border-2">
             <CardHeader>
-              <CardTitle className="text-lg font-bold">Rendimiento de Últimas Ventas</CardTitle>
+              <CardTitle className="text-lg font-bold">Flujo de Ventas</CardTitle>
             </CardHeader>
             <CardContent className="pl-2">
               <div className="h-[350px]">
@@ -296,7 +286,7 @@ export default function DashboardPage() {
                   <div className="flex flex-col items-center justify-center h-full text-muted-foreground italic gap-2 p-10 text-center">
                     <CheckCircle2 className="h-12 w-12 text-accent opacity-20 mb-2" />
                     <p className="font-bold text-lg">Sin datos para graficar</p>
-                    <p className="text-xs non-italic">Realiza ventas en el POS para ver el rendimiento del negocio.</p>
+                    <p className="text-xs non-italic">Realiza ventas en el POS para ver el rendimiento.</p>
                   </div>
                 )}
               </div>
@@ -305,13 +295,13 @@ export default function DashboardPage() {
           
           <Card className="col-span-3 border-2">
             <CardHeader>
-              <CardTitle className="text-lg font-bold">Alertas de Reposición</CardTitle>
+              <CardTitle className="text-lg font-bold">Alertas Críticas</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 {(products || [])
                   .filter(p => (p.stockQuantity || 0) <= 5)
-                  .slice(0, 6)
+                  .slice(0, 8)
                   .map((item) => (
                     <div key={item.id} className="flex items-center justify-between space-x-4 p-2 rounded-lg hover:bg-muted/50 transition-colors border border-transparent hover:border-border">
                       <div className="flex flex-col space-y-1">
@@ -325,11 +315,8 @@ export default function DashboardPage() {
                   ))}
                 {(!products || products.filter(p => (p.stockQuantity || 0) <= 5).length === 0) && (
                   <div className="flex flex-col items-center py-16 opacity-30 italic text-sm text-center gap-2">
-                    <div className="bg-accent/10 p-4 rounded-full">
-                      <CheckCircle2 className="h-10 w-10 text-accent" />
-                    </div>
-                    <p className="font-bold">Stock al día</p>
-                    <p className="text-[10px]">No hay productos con bajo stock.</p>
+                    <CheckCircle2 className="h-10 w-10 text-accent" />
+                    <p className="font-bold uppercase tracking-widest text-[10px]">Stock al día</p>
                   </div>
                 )}
               </div>
