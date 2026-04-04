@@ -110,7 +110,7 @@ export function AppSidebar() {
       <SidebarHeader className="h-16 flex items-center px-6">
         <Link href="/" className="flex items-center gap-2 font-black text-xl group-data-[collapsible=icon]:justify-center">
           <ShoppingBag className="h-8 w-8 text-accent shrink-0" />
-          <span className="group-data-[collapsible=icon]:hidden tracking-tighter uppercase">ALMACÉN <span className="text-accent">EL GRINGO</span></span>
+          <span className="group-data-[collapsible=icon]:hidden tracking-tighter uppercase">VENDIX<span className="text-accent">PRO</span></span>
         </Link>
       </SidebarHeader>
       <SidebarSeparator className="opacity-10" />
@@ -182,7 +182,7 @@ export function AppSidebar() {
             <div className="flex items-center gap-2">
               <UserCircle className="h-8 w-8 text-accent" />
               <div className="flex flex-col overflow-hidden">
-                <span className="text-xs font-black truncate uppercase tracking-tighter">{user.displayName || "Admin El Gringo"}</span>
+                <span className="text-xs font-black truncate uppercase tracking-tighter">{user.displayName || "Admin Vendix"}</span>
                 <span className="text-[9px] opacity-70 truncate">{user.email}</span>
               </div>
             </div>

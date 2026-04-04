@@ -5,8 +5,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { FirebaseClientProvider } from '@/firebase/client-provider';
 
 export const metadata: Metadata = {
-  title: 'Almacén El Gringo - Punto de Venta Profesional',
-  description: 'Gestión inteligente de stock, ventas y finanzas para Almacén El Gringo.',
+  title: 'VENDIXPRO - Punto de Venta Profesional',
+  description: 'Gestión inteligente de stock, ventas y finanzas en la nube.',
 };
 
 export default function RootLayout({

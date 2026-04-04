@@ -54,7 +54,7 @@ export default function AuthPage() {
         }
         toast({
           title: "Cuenta creada",
-          description: "Bienvenido a ALMACÉN EL GRINGO.",
+          description: "Bienvenido a VENDIXPRO.",
         });
       } else {
         await signInWithEmailAndPassword(auth, email, password);
@@ -93,10 +93,10 @@ export default function AuthPage() {
             <ShoppingBag className="h-10 w-10 text-accent" />
           </div>
           <h1 className="text-3xl font-black tracking-tighter font-headline uppercase">
-            ALMACÉN <span className="text-accent">EL GRINGO</span>
+            VENDIX<span className="text-accent">PRO</span>
           </h1>
           <p className="text-muted-foreground text-center mt-2 font-medium">
-            Sistema de Gestión y Punto de Venta
+            Sistema de Gestión y Punto de Venta Profesional
           </p>
         </div>
 
@@ -120,7 +120,7 @@ export default function AuthPage() {
                     <Label htmlFor="email-login">Correo Electrónico</Label>
                     <div className="relative">
                       <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input id="email-login" name="email" type="email" placeholder="admin@elgringo.pro" className="pl-10" required />
+                      <Input id="email-login" name="email" type="email" placeholder="admin@vendix.pro" className="pl-10" required />
                     </div>
                   </div>
                   <div className="space-y-2">
@@ -148,7 +148,7 @@ export default function AuthPage() {
               <CardHeader>
                 <CardTitle>Nueva Cuenta</CardTitle>
                 <CardDescription>
-                  Regístrate para empezar a gestionar tu almacén.
+                  Regístrate para empezar a gestionar tu negocio.
                 </CardDescription>
               </CardHeader>
               <form onSubmit={(e) => handleAuth(e, "register")}>
@@ -157,14 +157,14 @@ export default function AuthPage() {
                     <Label htmlFor="name-reg">Nombre / Razón Social</Label>
                     <div className="relative">
                       <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input id="name-reg" name="name" placeholder="Almacén El Gringo" className="pl-10" required />
+                      <Input id="name-reg" name="name" placeholder="Mi Negocio Vendix" className="pl-10" required />
                     </div>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="email-reg">Correo Electrónico</Label>
                     <div className="relative">
                       <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input id="email-reg" name="email" type="email" placeholder="info@elgringo.pro" className="pl-10" required />
+                      <Input id="email-reg" name="email" type="email" placeholder="info@vendix.pro" className="pl-10" required />
                     </div>
                   </div>
                   <div className="space-y-2">

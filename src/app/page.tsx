@@ -201,7 +201,7 @@ export default function DashboardPage() {
         <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold font-headline uppercase tracking-tighter">Panel de Gestión</h1>
-            <p className="text-muted-foreground italic font-semibold text-accent">Almacén El Gringo</p>
+            <p className="text-muted-foreground italic font-semibold text-accent">VENDIXPRO Professional POS</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <AlertDialog>
