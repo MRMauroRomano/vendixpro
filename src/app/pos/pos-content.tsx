@@ -124,7 +124,7 @@ export default function POSContent() {
   const { data: categoriesData } = useCollection(categoriesRef);
   const { data: customersData } = useCollection(customersRef);
 
-  const products = productsData || [];
+  const products = useMemo(() => productsData || [], [productsData]);
   const categories = categoriesData || [];
   const customers = customersData || [];
 
@@ -154,24 +154,42 @@ export default function POSContent() {
       return [...prev, { product: productToAdd, quantity: 1 }];
     });
 
-    // Mantener el foco en el buscador para el siguiente escaneo
+    // Mantener foco siempre en el buscador
     setTimeout(() => searchInputRef.current?.focus(), 50);
   }, []);
 
-  // Lógica de escaneo automático (Supermercado)
-  useEffect(() => {
-    if (!searchTerm || searchTerm.length < 3) return;
+  // Lógica de Escaneo Ultra-Rápido (Supermercado)
+  const processScan = useCallback((code: string) => {
+    const cleanCode = code.trim().toLowerCase();
+    if (!cleanCode) return;
 
-    // Buscar coincidencia exacta por SKU
     const exactMatch = products.find(p => 
-      p.sku && p.sku.trim().toLowerCase() === searchTerm.trim().toLowerCase()
+      p.sku && p.sku.trim().toLowerCase() === cleanCode
     );
 
     if (exactMatch) {
       addToCart(exactMatch);
-      setSearchTerm(""); // Limpiar para el próximo escaneo
+      setSearchTerm(""); // Limpiar instantáneamente para el próximo escaneo
+      return true;
     }
-  }, [searchTerm, products, addToCart]);
+    return false;
+  }, [products, addToCart]);
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      const found = processScan(searchTerm);
+      if (found) {
+        e.preventDefault();
+      }
+    }
+  };
+
+  // Efecto para búsqueda parcial o escaneos automáticos que no envían Enter (menos común)
+  useEffect(() => {
+    if (searchTerm.length >= 8) { // Generalmente un EAN o SKU tiene al menos 8 caracteres
+      processScan(searchTerm);
+    }
+  }, [searchTerm, processScan]);
 
   const filteredProducts = useMemo(() => {
     const term = searchTerm.toLowerCase();
@@ -185,7 +203,7 @@ export default function POSContent() {
       
       return matchesSearch && matchesCategory;
     });
-    return matches.slice(0, 40); // Límite de renderizado para máxima velocidad
+    return matches.slice(0, 60); 
   }, [products, searchTerm, selectedCategoryFilter]);
 
   const handleAddVariablePriceProduct = () => {
@@ -193,6 +211,7 @@ export default function POSContent() {
       addToCart(variableProductDialog, tempVariablePrice);
       setVariableProductDialog(null);
       setTempVariablePrice(0);
+      setTimeout(() => searchInputRef.current?.focus(), 100);
     }
   };
 
@@ -327,7 +346,7 @@ export default function POSContent() {
       setCart([]);
       setIsPaymentDialogOpen(false);
       resetPayment();
-      setTimeout(() => searchInputRef.current?.focus(), 100);
+      setTimeout(() => searchInputRef.current?.focus(), 150);
     } catch (error) {
       toast({ variant: "destructive", title: "Error al registrar venta" });
     }
@@ -366,6 +385,7 @@ export default function POSContent() {
                   className="pl-11 h-12 text-base shadow-sm border-2 border-primary/20 focus:border-accent bg-white"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
+                  onKeyDown={handleKeyDown}
                   autoFocus
                 />
               </div>
@@ -480,7 +500,7 @@ export default function POSContent() {
                     {product.name} {product.variant && <span className="text-accent">({product.variant})</span>}
                   </h3>
                   <div className="text-xl font-black text-primary mt-auto pt-2">
-                    {product.isVariablePrice ? "Precio Variable" : `$${(product.price || 0).toLocaleString()}`}
+                    {product.isVariablePrice ? "Variable" : `$${(product.price || 0).toLocaleString()}`}
                   </div>
                 </CardContent>
               </Card>
