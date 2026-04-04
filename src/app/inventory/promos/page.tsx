@@ -340,7 +340,6 @@ function PromoFields({ promo, allProducts, bundleItems, setBundleItems }: any) {
               value={prodSearch}
               onChange={(e) => setProdSearch(e.target.value)}
               onKeyDown={(e) => e.stopPropagation()}
-              autoFocus
             />
             {filteredBaseProducts.length > 0 && (
               <div className="absolute top-full left-0 w-full bg-white border shadow-xl rounded-lg mt-1 z-50 overflow-hidden divide-y">

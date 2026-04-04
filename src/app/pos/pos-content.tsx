@@ -93,6 +93,12 @@ export default function POSContent() {
     }
   }, [categoryParam]);
 
+  // Asegurar foco inicial
+  useEffect(() => {
+    const timer = setTimeout(() => searchInputRef.current?.focus(), 500);
+    return () => clearTimeout(timer);
+  }, []);
+
   const activeSessionQuery = useMemoFirebase(() => {
     if (!firestore || !user?.uid) return null;
     return query(
@@ -155,41 +161,28 @@ export default function POSContent() {
     });
 
     // Mantener foco siempre en el buscador
-    setTimeout(() => searchInputRef.current?.focus(), 50);
+    if (searchInputRef.current) {
+       setTimeout(() => searchInputRef.current?.focus(), 100);
+    }
   }, []);
 
-  // Lógica de Escaneo Ultra-Rápido (Supermercado)
-  const processScan = useCallback((code: string) => {
-    const cleanCode = code.trim().toLowerCase();
-    if (!cleanCode) return;
-
-    const exactMatch = products.find(p => 
-      p.sku && p.sku.trim().toLowerCase() === cleanCode
-    );
-
-    if (exactMatch) {
-      addToCart(exactMatch);
-      setSearchTerm(""); // Limpiar instantáneamente para el próximo escaneo
-      return true;
-    }
-    return false;
-  }, [products, addToCart]);
-
+  // Lógica de Escaneo Estilo Supermercado
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
-      const found = processScan(searchTerm);
-      if (found) {
+      const code = searchTerm.trim().toLowerCase();
+      if (!code) return;
+
+      const exactMatch = products.find(p => 
+        p.sku && p.sku.trim().toLowerCase() === code
+      );
+
+      if (exactMatch) {
         e.preventDefault();
+        setSearchTerm(""); // Limpiar antes de procesar para evitar duplicados
+        addToCart(exactMatch);
       }
     }
   };
-
-  // Efecto para búsqueda parcial o escaneos automáticos que no envían Enter (menos común)
-  useEffect(() => {
-    if (searchTerm.length >= 8) { // Generalmente un EAN o SKU tiene al menos 8 caracteres
-      processScan(searchTerm);
-    }
-  }, [searchTerm, processScan]);
 
   const filteredProducts = useMemo(() => {
     const term = searchTerm.toLowerCase();
@@ -211,7 +204,9 @@ export default function POSContent() {
       addToCart(variableProductDialog, tempVariablePrice);
       setVariableProductDialog(null);
       setTempVariablePrice(0);
-      setTimeout(() => searchInputRef.current?.focus(), 100);
+      if (searchInputRef.current) {
+        setTimeout(() => searchInputRef.current?.focus(), 150);
+      }
     }
   };
 
@@ -346,7 +341,9 @@ export default function POSContent() {
       setCart([]);
       setIsPaymentDialogOpen(false);
       resetPayment();
-      setTimeout(() => searchInputRef.current?.focus(), 150);
+      if (searchInputRef.current) {
+        setTimeout(() => searchInputRef.current?.focus(), 200);
+      }
     } catch (error) {
       toast({ variant: "destructive", title: "Error al registrar venta" });
     }
@@ -386,7 +383,6 @@ export default function POSContent() {
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  autoFocus
                 />
               </div>
               
