@@ -18,13 +18,9 @@ import {
   QrCode,
   ChevronRight,
   StickyNote,
-  Scale,
   Loader2,
   Lock,
-  Filter,
   GlassWater,
-  Star,
-  Layers,
   Barcode
 } from "lucide-react";
 import { 
@@ -161,9 +157,7 @@ export default function POSContent() {
     });
 
     // Mantener foco siempre en el buscador
-    if (searchInputRef.current) {
-       setTimeout(() => searchInputRef.current?.focus(), 100);
-    }
+    setTimeout(() => searchInputRef.current?.focus(), 100);
   }, []);
 
   // Lógica de Escaneo Estilo Supermercado
@@ -178,7 +172,7 @@ export default function POSContent() {
 
       if (exactMatch) {
         e.preventDefault();
-        setSearchTerm(""); // Limpiar antes de procesar para evitar duplicados
+        setSearchTerm(""); // Limpiar antes de añadir
         addToCart(exactMatch);
       }
     }
@@ -196,7 +190,7 @@ export default function POSContent() {
       
       return matchesSearch && matchesCategory;
     });
-    return matches.slice(0, 60); 
+    return matches.slice(0, 48); // Limitar resultados para fluidez
   }, [products, searchTerm, selectedCategoryFilter]);
 
   const handleAddVariablePriceProduct = () => {
@@ -204,14 +198,12 @@ export default function POSContent() {
       addToCart(variableProductDialog, tempVariablePrice);
       setVariableProductDialog(null);
       setTempVariablePrice(0);
-      if (searchInputRef.current) {
-        setTimeout(() => searchInputRef.current?.focus(), 150);
-      }
+      setTimeout(() => searchInputRef.current?.focus(), 150);
     }
   };
 
   const addCustomItem = () => {
-    if (!customName || customPrice < 0) return;
+    if (!customName || customPrice <= 0) return;
 
     const customProduct = {
       id: `custom-${Date.now()}`,
@@ -300,29 +292,12 @@ export default function POSContent() {
         });
 
         if (!item.product.isCustom) {
-          if (item.product.category === "Promos" && item.product.bundleItems && item.product.bundleItems.length > 0) {
-            item.product.bundleItems.forEach((bundleItem: any) => {
-              const componentDocRef = doc(firestore, "users", user.uid, "products", bundleItem.productId);
-              const originalProduct = products.find(p => p.id === bundleItem.productId);
-              if (originalProduct) {
-                const totalDeduction = bundleItem.quantity * item.quantity;
-                updateDocumentNonBlocking(componentDocRef, {
-                  stockQuantity: Math.max(0, (originalProduct.stockQuantity || 0) - totalDeduction)
-                });
-              }
+          const productDocRef = doc(firestore, "users", user.uid, "products", item.product.id);
+          const currentProduct = products.find(p => p.id === item.product.id);
+          if (currentProduct) {
+             updateDocumentNonBlocking(productDocRef, {
+              stockQuantity: Math.max(0, (currentProduct.stockQuantity || 0) - item.quantity)
             });
-            const promoDocRef = doc(firestore, "users", user.uid, "products", item.product.id);
-            updateDocumentNonBlocking(promoDocRef, {
-              stockQuantity: Math.max(0, (item.product.stockQuantity || 0) - item.quantity)
-            });
-          } else {
-            const productDocRef = doc(firestore, "users", user.uid, "products", item.product.id);
-            const currentProduct = products.find(p => p.id === item.product.id);
-            if (currentProduct) {
-               updateDocumentNonBlocking(productDocRef, {
-                stockQuantity: Math.max(0, (currentProduct.stockQuantity || 0) - item.quantity)
-              });
-            }
           }
         }
       });
@@ -341,9 +316,7 @@ export default function POSContent() {
       setCart([]);
       setIsPaymentDialogOpen(false);
       resetPayment();
-      if (searchInputRef.current) {
-        setTimeout(() => searchInputRef.current?.focus(), 200);
-      }
+      setTimeout(() => searchInputRef.current?.focus(), 200);
     } catch (error) {
       toast({ variant: "destructive", title: "Error al registrar venta" });
     }
@@ -383,6 +356,7 @@ export default function POSContent() {
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   onKeyDown={handleKeyDown}
+                  autoComplete="off"
                 />
               </div>
               
@@ -470,7 +444,7 @@ export default function POSContent() {
             ) : filteredProducts.map(product => (
               <Card 
                 key={product.id} 
-                className={`cursor-pointer hover:shadow-xl transition-all border-2 group overflow-hidden bg-card flex flex-col h-fit min-h-[260px] ${product.isVariablePrice ? 'border-dashed border-accent/40' : ''} ${product.category === 'Promos' ? 'border-accent/40 shadow-sm' : ''}`}
+                className={`cursor-pointer hover:shadow-xl transition-all border-2 group overflow-hidden bg-card flex flex-col h-fit min-h-[240px] ${product.isVariablePrice ? 'border-dashed border-accent/40' : ''}`}
                 onClick={() => addToCart(product)}
               >
                 <div className="relative aspect-video w-full overflow-hidden bg-muted border-b shrink-0">
@@ -504,7 +478,7 @@ export default function POSContent() {
           </div>
         </div>
 
-        <Card className="lg:col-span-4 flex flex-col shadow-2xl overflow-hidden border-l-2 h-full bg-card max-w-[400px]">
+        <Card className="lg:col-span-4 flex flex-col shadow-2xl overflow-hidden border-l-2 h-full bg-card">
           <CardHeader className="py-4 px-6 border-b bg-muted/20 shrink-0">
             <div className="flex justify-between items-center">
               <CardTitle className="text-base flex items-center gap-2 font-black uppercase tracking-tighter">
