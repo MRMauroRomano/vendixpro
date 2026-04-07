@@ -89,11 +89,15 @@ export default function POSContent() {
     }
   }, [categoryParam]);
 
-  // Asegurar foco inicial
+  // Asegurar foco inicial persistente
   useEffect(() => {
-    const timer = setTimeout(() => searchInputRef.current?.focus(), 500);
-    return () => clearTimeout(timer);
-  }, []);
+    const focusTimer = setInterval(() => {
+      if (document.activeElement?.tagName !== 'INPUT' && !isPaymentDialogOpen && !variableProductDialog && !isCustomItemDialogOpen) {
+        searchInputRef.current?.focus();
+      }
+    }, 1000);
+    return () => clearInterval(focusTimer);
+  }, [isPaymentDialogOpen, variableProductDialog, isCustomItemDialogOpen]);
 
   const activeSessionQuery = useMemoFirebase(() => {
     if (!firestore || !user?.uid) return null;
@@ -156,23 +160,22 @@ export default function POSContent() {
       return [...prev, { product: productToAdd, quantity: 1 }];
     });
 
-    // Mantener foco siempre en el buscador
-    setTimeout(() => searchInputRef.current?.focus(), 100);
+    // Refocus después de añadir
+    setTimeout(() => searchInputRef.current?.focus(), 50);
   }, []);
 
-  // Lógica de Escaneo Estilo Supermercado
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
-      const code = searchTerm.trim().toLowerCase();
+      const code = searchTerm.trim();
       if (!code) return;
 
       const exactMatch = products.find(p => 
-        p.sku && p.sku.trim().toLowerCase() === code
+        p.sku && p.sku.trim() === code
       );
 
       if (exactMatch) {
         e.preventDefault();
-        setSearchTerm(""); // Limpiar antes de añadir
+        setSearchTerm(""); // Limpiar inmediatamente
         addToCart(exactMatch);
       }
     }
@@ -183,14 +186,13 @@ export default function POSContent() {
     const matches = products.filter(p => {
       const matchesSearch = !term || 
                           String(p.name || "").toLowerCase().includes(term) ||
-                          String(p.sku || "").toLowerCase().includes(term) ||
-                          String(p.variant || "").toLowerCase().includes(term);
+                          String(p.sku || "").toLowerCase().includes(term);
       
       const matchesCategory = !selectedCategoryFilter || p.category === selectedCategoryFilter;
       
       return matchesSearch && matchesCategory;
     });
-    return matches.slice(0, 48); // Limitar resultados para fluidez
+    return matches.slice(0, 40);
   }, [products, searchTerm, selectedCategoryFilter]);
 
   const handleAddVariablePriceProduct = () => {
@@ -261,7 +263,6 @@ export default function POSContent() {
       toast({
         variant: "destructive",
         title: "Cliente no seleccionado",
-        description: "Debes elegir un cliente para registrar una venta a cuenta corriente."
       });
       return;
     }
@@ -312,7 +313,7 @@ export default function POSContent() {
         }
       }
 
-      toast({ title: "Venta Registrada", description: `Venta por $${total.toLocaleString()} completada.` });
+      toast({ title: "Venta Registrada", description: `Monto: $${total.toLocaleString()}` });
       setCart([]);
       setIsPaymentDialogOpen(false);
       resetPayment();
@@ -329,10 +330,8 @@ export default function POSContent() {
           <div className="bg-red-100 p-6 rounded-full">
             <Lock className="h-16 w-16 text-red-600" />
           </div>
-          <h1 className="text-3xl font-black text-primary uppercase tracking-tight">Caja Cerrada</h1>
-          <p className="text-muted-foreground">
-            Para realizar ventas, primero debes iniciar un turno en el sistema.
-          </p>
+          <h1 className="text-3xl font-black text-primary uppercase">Caja Cerrada</h1>
+          <p className="text-muted-foreground">Para realizar ventas, primero debes iniciar un turno.</p>
           <Button asChild size="lg" className="font-bold h-14 px-8">
             <Link href="/cash">Abrir Caja Ahora</Link>
           </Button>
@@ -351,15 +350,15 @@ export default function POSContent() {
                 <Barcode className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-accent animate-pulse" />
                 <Input 
                   ref={searchInputRef}
-                  placeholder="Escanee código o busque producto..." 
+                  placeholder="Escanee código de barras..." 
                   className="pl-11 h-12 text-base shadow-sm border-2 border-primary/20 focus:border-accent bg-white"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   onKeyDown={handleKeyDown}
                   autoComplete="off"
+                  autoFocus
                 />
               </div>
-              
               <Dialog open={isCustomItemDialogOpen} onOpenChange={setIsCustomItemDialogOpen}>
                 <DialogTrigger asChild>
                   <Button variant="outline" className="h-12 gap-2 border-accent text-accent hover:bg-accent/5 font-bold">
@@ -368,68 +367,30 @@ export default function POSContent() {
                   </Button>
                 </DialogTrigger>
                 <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Venta de Producto Manual</DialogTitle>
-                  </DialogHeader>
+                  <DialogHeader><DialogTitle>Producto Manual</DialogTitle></DialogHeader>
                   <div className="space-y-4 py-4">
                     <div className="space-y-2">
-                      <label className="text-sm font-bold">Descripción del Producto</label>
-                      <Input 
-                        placeholder="Ej: Recarga, Artículo sin código..." 
-                        value={customName}
-                        onChange={(e) => setCustomName(e.target.value)}
-                      />
+                      <label className="text-sm font-bold">Descripción</label>
+                      <Input placeholder="Ej: Varios..." value={customName} onChange={(e) => setCustomName(e.target.value)} />
                     </div>
                     <div className="space-y-2">
                       <label className="text-sm font-bold">Precio ($)</label>
-                      <Input 
-                        type="number" 
-                        placeholder="0.00" 
-                        className="text-xl font-bold h-12"
-                        value={customPrice || ""}
-                        onChange={(e) => setCustomPrice(Number(e.target.value))}
-                      />
+                      <Input type="number" className="text-xl font-bold h-12" value={customPrice || ""} onChange={(e) => setCustomPrice(Number(e.target.value))} />
                     </div>
                   </div>
-                  <DialogFooter>
-                    <Button className="w-full h-11" onClick={addCustomItem} disabled={!customName || customPrice <= 0}>
-                      Añadir al Carrito
-                    </Button>
-                  </DialogFooter>
+                  <DialogFooter><Button className="w-full h-11" onClick={addCustomItem}>Añadir</Button></DialogFooter>
                 </DialogContent>
               </Dialog>
             </div>
 
             <ScrollArea className="w-full whitespace-nowrap pb-2">
               <div className="flex w-max space-x-2">
-                <Button
-                  variant={selectedCategoryFilter === null ? "default" : "outline"}
-                  size="sm"
-                  className="rounded-full font-bold uppercase text-[10px] tracking-wider h-9"
-                  onClick={() => setSelectedCategoryFilter(null)}
-                >
-                  Todas
-                </Button>
-                <Button
-                  variant={selectedCategoryFilter === "Promos" ? "default" : "outline"}
-                  size="sm"
-                  className="rounded-full font-bold uppercase text-[10px] tracking-wider h-9 gap-1.5 border-accent text-accent data-[state=active]:bg-accent data-[state=active]:text-accent-foreground"
-                  onClick={() => setSelectedCategoryFilter("Promos")}
-                  data-state={selectedCategoryFilter === "Promos" ? "active" : "inactive"}
-                >
-                  <GlassWater className="h-3 w-3" />
-                  Promos
+                <Button variant={selectedCategoryFilter === null ? "default" : "outline"} size="sm" className="rounded-full font-bold uppercase text-[10px] h-9" onClick={() => setSelectedCategoryFilter(null)}>Todas</Button>
+                <Button variant={selectedCategoryFilter === "Promos" ? "default" : "outline"} size="sm" className="rounded-full font-bold uppercase text-[10px] h-9 gap-1.5 border-accent text-accent" onClick={() => setSelectedCategoryFilter("Promos")}>
+                  <GlassWater className="h-3 w-3" /> Promos
                 </Button>
                 {categories.filter(c => c.name !== "Promos").map((cat) => (
-                  <Button
-                    key={cat.id}
-                    variant={selectedCategoryFilter === cat.name ? "default" : "outline"}
-                    size="sm"
-                    className="rounded-full font-bold uppercase text-[10px] tracking-wider h-9"
-                    onClick={() => setSelectedCategoryFilter(cat.name)}
-                  >
-                    {cat.name}
-                  </Button>
+                  <Button key={cat.id} variant={selectedCategoryFilter === cat.name ? "default" : "outline"} size="sm" className="rounded-full font-bold uppercase text-[10px] h-9" onClick={() => setSelectedCategoryFilter(cat.name)}>{cat.name}</Button>
                 ))}
               </div>
               <ScrollBar orientation="horizontal" />
@@ -438,176 +399,91 @@ export default function POSContent() {
           
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 overflow-y-auto pr-2 pb-6 flex-1">
             {isProductsLoading ? (
-              <div className="col-span-full flex justify-center py-20">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              </div>
+              <div className="col-span-full flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
             ) : filteredProducts.map(product => (
-              <Card 
-                key={product.id} 
-                className={`cursor-pointer hover:shadow-xl transition-all border-2 group overflow-hidden bg-card flex flex-col h-fit min-h-[240px] ${product.isVariablePrice ? 'border-dashed border-accent/40' : ''}`}
-                onClick={() => addToCart(product)}
-              >
+              <Card key={product.id} className="cursor-pointer hover:shadow-xl transition-all border-2 group bg-card flex flex-col min-h-[220px]" onClick={() => addToCart(product)}>
                 <div className="relative aspect-video w-full overflow-hidden bg-muted border-b shrink-0">
-                   <img 
-                    src={product.imageUrl || `https://picsum.photos/seed/${product.id}/400/300`} 
-                    alt={product.name}
-                    loading="lazy"
-                    className="h-full w-full object-cover transition-transform group-hover:scale-105"
-                  />
-                  <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">
-                    <Badge className={`shadow-md font-bold ${(product.stockQuantity || 0) <= 5 ? 'bg-red-500' : 'bg-primary'}`}>
-                      {product.stockQuantity || 0} u.
-                    </Badge>
-                  </div>
+                   <img src={product.imageUrl || `https://picsum.photos/seed/${product.id}/400/300`} className="h-full w-full object-cover transition-transform group-hover:scale-105" alt="" />
+                   <Badge className="absolute top-2 right-2 font-bold bg-primary">{product.stockQuantity || 0} u.</Badge>
                 </div>
-                <CardContent className="p-4 space-y-2 flex-1 flex flex-col">
-                  <div className="flex justify-between items-start gap-2 h-4 mb-1">
-                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">
-                      {product.category || "General"}
-                    </span>
+                <CardContent className="p-3 space-y-1 flex-1 flex flex-col justify-between">
+                  <div>
+                    <span className="text-[9px] font-bold text-muted-foreground uppercase">{product.category}</span>
+                    <h3 className="font-bold text-xs line-clamp-2 leading-tight">{product.name} {product.variant && <span className="text-accent">({product.variant})</span>}</h3>
                   </div>
-                  <h3 className="font-bold text-sm line-clamp-2 leading-tight h-10">
-                    {product.name} {product.variant && <span className="text-accent">({product.variant})</span>}
-                  </h3>
-                  <div className="text-xl font-black text-primary mt-auto pt-2">
-                    {product.isVariablePrice ? "Variable" : `$${(product.price || 0).toLocaleString()}`}
-                  </div>
+                  <div className="text-lg font-black text-primary">{product.isVariablePrice ? "Variable" : `$${(product.price || 0).toLocaleString()}`}</div>
                 </CardContent>
               </Card>
             ))}
           </div>
         </div>
 
-        <Card className="lg:col-span-4 flex flex-col shadow-2xl overflow-hidden border-l-2 h-full bg-card">
+        <Card className="lg:col-span-4 flex flex-col shadow-2xl border-l-2 h-full bg-card">
           <CardHeader className="py-4 px-6 border-b bg-muted/20 shrink-0">
             <div className="flex justify-between items-center">
-              <CardTitle className="text-base flex items-center gap-2 font-black uppercase tracking-tighter">
-                <ShoppingBag className="h-4 w-4 text-primary" />
-                Venta Actual
-              </CardTitle>
-              <Button variant="ghost" size="sm" onClick={() => setCart([])} className="text-muted-foreground hover:text-red-500 text-[10px] h-7" disabled={cart.length === 0}>
-                VACIAR
-              </Button>
+              <CardTitle className="text-sm font-black uppercase flex items-center gap-2"><ShoppingBag className="h-4 w-4" /> Venta</CardTitle>
+              <Button variant="ghost" size="sm" onClick={() => setCart([])} className="text-muted-foreground hover:text-red-500 text-[10px] h-7" disabled={cart.length === 0}>VACIAR</Button>
             </div>
           </CardHeader>
-          
           <CardContent className="flex-1 overflow-y-auto p-0">
             {cart.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-8 text-center space-y-4 opacity-30">
-                <Barcode className="h-12 w-12" />
-                <p className="text-sm font-black uppercase tracking-widest">Escanee un producto</p>
+                <Barcode className="h-12 w-12" /><p className="text-xs font-black uppercase">Escanee un producto</p>
               </div>
             ) : (
-              <div className="divide-y divide-border/50">
+              <div className="divide-y">
                 {cart.map((item, index) => (
-                  <div key={`${item.product.id}-${index}`} className="p-3 flex gap-3 items-center group hover:bg-muted/10 transition-colors">
+                  <div key={`${item.product.id}-${index}`} className="p-3 flex gap-3 items-center hover:bg-muted/10">
                     <div className="flex-1 min-w-0">
-                      <div className="font-bold text-xs truncate">
-                        {item.product.name}
-                        {item.product.variant && <span className="ml-1 text-[9px] text-accent">({item.product.variant})</span>}
-                      </div>
+                      <div className="font-bold text-xs truncate">{item.product.name}</div>
                       <div className="text-[10px] text-muted-foreground font-mono">${(item.product.price || 0).toLocaleString()} x {item.quantity}</div>
                     </div>
-                    <div className="flex flex-col items-end gap-1">
-                      <div className="flex items-center gap-1.5 bg-muted/50 rounded p-0.5 border">
-                        <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => updateQuantity(item.product.id, -1, item.product.price)}>
-                          <Minus className="h-2.5 w-2.5" />
-                        </Button>
-                        <span className="w-5 text-center text-xs font-black">{item.quantity}</span>
-                        <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => updateQuantity(item.product.id, 1, item.product.price)}>
-                          <Plus className="h-2.5 w-2.5" />
-                        </Button>
-                      </div>
-                      <span className="font-black text-xs text-primary">${((item.product.price || 0) * item.quantity).toLocaleString()}</span>
+                    <div className="flex items-center gap-1.5 bg-muted/50 rounded p-0.5 border">
+                      <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => updateQuantity(item.product.id, -1, item.product.price)}><Minus className="h-2.5 w-2.5" /></Button>
+                      <span className="w-5 text-center text-xs font-black">{item.quantity}</span>
+                      <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => updateQuantity(item.product.id, 1, item.product.price)}><Plus className="h-2.5 w-2.5" /></Button>
                     </div>
                   </div>
                 ))}
               </div>
             )}
           </CardContent>
-          
           <CardFooter className="flex-col p-5 border-t bg-primary/5 gap-3 shrink-0">
             <div className="w-full flex justify-between items-center mb-2">
-              <span className="text-sm font-black text-muted-foreground uppercase tracking-widest">Total</span>
+              <span className="text-xs font-black uppercase text-muted-foreground">Total</span>
               <span className="text-3xl font-black text-primary">${total.toLocaleString()}</span>
             </div>
-            
             <Dialog open={isPaymentDialogOpen} onOpenChange={(open) => { setIsPaymentDialogOpen(open); if(!open) resetPayment(); }}>
-              <DialogTrigger asChild>
-                <Button className="w-full h-14 text-lg font-black gap-2 shadow-lg bg-accent text-accent-foreground hover:bg-accent/90" disabled={cart.length === 0}>
-                  COBRAR VENTA
-                  <ChevronRight className="h-5 w-5" />
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[450px]">
-                <DialogHeader>
-                  <DialogTitle className="text-xl font-bold">Resumen de Pago</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-5 py-3">
+              <DialogTrigger asChild><Button className="w-full h-14 text-lg font-black bg-accent text-accent-foreground shadow-lg" disabled={cart.length === 0}>COBRAR</Button></DialogTrigger>
+              <DialogContent className="sm:max-w-[420px]">
+                <DialogHeader><DialogTitle>Cobro</DialogTitle></DialogHeader>
+                <div className="space-y-4 py-2">
                   <div className="grid grid-cols-4 gap-2">
-                    {[
-                      { id: "Efectivo", icon: Banknote, label: "Efectivo" },
-                      { id: "Tarjeta", icon: CreditCard, label: "Tarjeta" },
-                      { id: "QR", icon: QrCode, label: "QR / Trans" },
-                      { id: "Cuenta Corriente", icon: User, label: "Fiado" },
-                    ].map((method) => (
-                      <Button
-                        key={method.id}
-                        variant={paymentMethod === method.id ? "default" : "outline"}
-                        className="flex flex-col h-16 gap-1 border-2"
-                        onClick={() => { resetPayment(); setPaymentMethod(method.id); }}
-                      >
-                        <method.icon className="h-5 w-5" />
-                        <span className="text-[9px] font-bold uppercase">{method.label}</span>
+                    {[{ id: "Efectivo", icon: Banknote, label: "Efectivo" }, { id: "Tarjeta", icon: CreditCard, label: "Tarjeta" }, { id: "QR", icon: QrCode, label: "QR" }, { id: "Cuenta Corriente", icon: User, label: "Fiado" }].map((m) => (
+                      <Button key={m.id} variant={paymentMethod === m.id ? "default" : "outline"} className="flex flex-col h-16 gap-1 border-2" onClick={() => { resetPayment(); setPaymentMethod(m.id); }}>
+                        <m.icon className="h-5 w-5" /><span className="text-[9px] font-bold uppercase">{m.label}</span>
                       </Button>
                     ))}
                   </div>
-
                   {paymentMethod === "Efectivo" && (
                     <div className="space-y-3 p-4 bg-muted/30 rounded-lg border-2 border-dashed">
-                      <div className="space-y-1">
-                        <label className="text-xs font-bold">Monto Recibido</label>
-                        <Input 
-                          type="number" 
-                          className="text-2xl font-black h-14"
-                          placeholder="0.00"
-                          value={cashReceived || ""}
-                          onChange={(e) => setCashReceived(Number(e.target.value))}
-                          autoFocus
-                        />
-                      </div>
-                      <div className="flex justify-between items-center p-3 bg-background rounded border">
-                        <span className="text-sm font-black uppercase">Vuelto:</span>
-                        <span className={`text-3xl font-black ${changeDue > 0 ? 'text-accent' : 'text-muted-foreground'}`}>
-                          ${changeDue.toLocaleString()}
-                        </span>
+                      <Input type="number" className="text-2xl font-black h-14" placeholder="Monto recibido..." value={cashReceived || ""} onChange={(e) => setCashReceived(Number(e.target.value))} autoFocus />
+                      <div className="flex justify-between items-center p-2 bg-background rounded border">
+                        <span className="text-xs font-black uppercase">Vuelto:</span>
+                        <span className="text-2xl font-black text-accent">${changeDue.toLocaleString()}</span>
                       </div>
                     </div>
                   )}
-
                   {paymentMethod === "Cuenta Corriente" && (
-                    <div className="space-y-1">
-                      <label className="text-xs font-bold">Seleccionar Cliente</label>
-                      <Select value={selectedCustomerId} onValueChange={setSelectedCustomerId}>
-                        <SelectTrigger className="h-11">
-                          <SelectValue placeholder="Buscar cliente..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {customers.map(customer => (
-                            <SelectItem key={customer.id} value={customer.id}>
-                              {customer.name} (Saldo: ${ (customer.currentBalance || 0).toLocaleString()})
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    <Select value={selectedCustomerId} onValueChange={setSelectedCustomerId}>
+                      <SelectTrigger className="h-11"><SelectValue placeholder="Cliente..." /></SelectTrigger>
+                      <SelectContent>{customers.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
+                    </Select>
                   )}
                 </div>
-                <DialogFooter className="sm:justify-between gap-3 mt-2">
-                  <Button variant="outline" onClick={() => setIsPaymentDialogOpen(false)} className="flex-1 h-12 font-bold">Cancelar</Button>
-                  <Button className="flex-1 h-12 text-base font-black gap-2" disabled={!paymentMethod || (paymentMethod === "Cuenta Corriente" && !selectedCustomerId)} onClick={handleCompleteSale}>
-                    Confirmar Venta
-                  </Button>
+                <DialogFooter className="gap-2">
+                  <Button variant="outline" onClick={() => setIsPaymentDialogOpen(false)} className="flex-1 h-12">Cerrar</Button>
+                  <Button className="flex-1 h-12 font-black" onClick={handleCompleteSale} disabled={!paymentMethod}>CONFIRMAR</Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>
@@ -617,26 +493,11 @@ export default function POSContent() {
 
       <Dialog open={!!variableProductDialog} onOpenChange={(open) => !open && setVariableProductDialog(null)}>
         <DialogContent className="sm:max-w-[400px]">
-          <DialogHeader>
-            <DialogTitle>Precio para: {variableProductDialog?.name}</DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>Precio: {variableProductDialog?.name}</DialogTitle></DialogHeader>
           <div className="py-6 space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-bold">Ingresar Precio de Venta ($)</label>
-              <Input 
-                type="number" 
-                placeholder="0.00" 
-                className="h-14 text-2xl font-black text-primary border-primary"
-                autoFocus
-                value={tempVariablePrice || ""}
-                onChange={(e) => setTempVariablePrice(Number(e.target.value))}
-                onKeyDown={(e) => e.key === 'Enter' && handleAddVariablePriceProduct()}
-              />
-            </div>
+            <Input type="number" className="h-14 text-2xl font-black border-primary" autoFocus value={tempVariablePrice || ""} onChange={(e) => setTempVariablePrice(Number(e.target.value))} onKeyDown={(e) => e.key === 'Enter' && handleAddVariablePriceProduct()} />
           </div>
-          <DialogFooter>
-            <Button className="w-full h-12 text-lg font-bold" onClick={handleAddVariablePriceProduct}>Añadir al Carrito</Button>
-          </DialogFooter>
+          <DialogFooter><Button className="w-full h-12 text-lg font-bold" onClick={handleAddVariablePriceProduct}>Añadir</Button></DialogFooter>
         </DialogContent>
       </Dialog>
     </AppLayout>

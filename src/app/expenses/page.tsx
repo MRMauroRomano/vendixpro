@@ -132,7 +132,7 @@ export default function ExpensesPage() {
     if (!user || !firestore) return;
     const docRef = doc(firestore, "users", user.uid, "expenses", expenseId);
     deleteDocumentNonBlocking(docRef);
-    toast({ title: "Gasto Eliminado", description: "El registro ha sido borrado de la caja." });
+    toast({ title: "Gasto Eliminado" });
   };
 
   if (isSessionLoading) {
@@ -152,10 +152,8 @@ export default function ExpensesPage() {
           <div className="bg-red-100 p-6 rounded-full">
             <Lock className="h-16 w-16 text-red-600" />
           </div>
-          <h1 className="text-3xl font-black text-primary uppercase tracking-tight">Registro Bloqueado</h1>
-          <p className="text-muted-foreground">
-            Para registrar gastos operativos, primero debes abrir la caja. Esto permite llevar un control exacto de las salidas de dinero durante el turno.
-          </p>
+          <h1 className="text-3xl font-black text-primary uppercase">Registro Bloqueado</h1>
+          <p className="text-muted-foreground">Para registrar gastos operativos, primero debes abrir la caja.</p>
           <Button asChild size="lg" className="font-bold h-14 px-8">
             <Link href="/cash">Abrir Caja Ahora</Link>
           </Button>
@@ -173,22 +171,14 @@ export default function ExpensesPage() {
             <p className="text-muted-foreground">Registre y categorice los egresos de su negocio.</p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" className="gap-2">
-              <Download className="h-4 w-4" />
-              CSV
-            </Button>
+            <Button variant="outline" className="gap-2"><Download className="h-4 w-4" /> CSV</Button>
             <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
               <DialogTrigger asChild>
-                <Button className="gap-2">
-                  <Plus className="h-4 w-4" />
-                  Registrar Gasto
-                </Button>
+                <Button className="gap-2"><Plus className="h-4 w-4" /> Registrar Gasto</Button>
               </DialogTrigger>
               <DialogContent>
                 <form onSubmit={handleSaveExpense}>
-                  <DialogHeader>
-                    <DialogTitle>Nuevo Egreso de Caja</DialogTitle>
-                  </DialogHeader>
+                  <DialogHeader><DialogTitle>Nuevo Egreso de Caja</DialogTitle></DialogHeader>
                   <div className="grid gap-4 py-4">
                     <div className="grid gap-2">
                       <label className="text-sm font-medium">Concepto / Descripción *</label>
@@ -209,9 +199,7 @@ export default function ExpensesPage() {
                       <Input name="date" type="date" defaultValue={format(new Date(), 'yyyy-MM-dd')} required />
                     </div>
                   </div>
-                  <DialogFooter>
-                    <Button type="submit" className="w-full">Guardar Gasto</Button>
-                  </DialogFooter>
+                  <DialogFooter><Button type="submit" className="w-full">Guardar Gasto</Button></DialogFooter>
                 </form>
               </DialogContent>
             </Dialog>
@@ -220,39 +208,22 @@ export default function ExpensesPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card className="bg-primary/5 border-primary/20">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Total Gastos (Mes)</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-black text-primary">${stats.totalMonthly.toLocaleString()}</div>
-            </CardContent>
+            <CardHeader className="pb-2"><CardTitle className="text-sm font-bold uppercase text-muted-foreground">Total Gastos (Mes)</CardTitle></CardHeader>
+            <CardContent><div className="text-3xl font-black text-primary">${stats.totalMonthly.toLocaleString()}</div></CardContent>
           </Card>
           <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Categoría Mayor Gasto</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-black">{stats.topCategory}</div>
-            </CardContent>
+            <CardHeader className="pb-2"><CardTitle className="text-sm font-bold uppercase text-muted-foreground">Categoría Mayor Gasto</CardTitle></CardHeader>
+            <CardContent><div className="text-3xl font-black">{stats.topCategory}</div></CardContent>
           </Card>
           <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Egresos del Mes</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-black">{stats.count} registros</div>
-            </CardContent>
+            <CardHeader className="pb-2"><CardTitle className="text-sm font-bold uppercase text-muted-foreground">Egresos del Mes</CardTitle></CardHeader>
+            <CardContent><div className="text-3xl font-black">{stats.count} registros</div></CardContent>
           </Card>
         </div>
 
         <Card className="border-2 shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between py-4 border-b">
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" className="gap-1">
-                <Calendar className="h-4 w-4" />
-                {format(new Date(), "MMMM yyyy", { locale: es })}
-              </Button>
-            </div>
+            <Button variant="outline" size="sm" className="gap-1"><Calendar className="h-4 w-4" />{format(new Date(), "MMMM yyyy", { locale: es })}</Button>
           </CardHeader>
           <CardContent className="p-0">
             {isLoading ? (
@@ -274,27 +245,12 @@ export default function ExpensesPage() {
                 <TableBody>
                   {expenses.map((exp) => (
                     <TableRow key={exp.id} className="hover:bg-muted/20">
-                      <TableCell className="font-medium">
-                        {format(new Date(exp.date + 'T00:00:00'), 'dd/MM/yyyy')}
-                      </TableCell>
+                      <TableCell className="font-medium">{format(new Date(exp.date + 'T00:00:00'), 'dd/MM/yyyy')}</TableCell>
                       <TableCell className="font-bold">{exp.concept}</TableCell>
-                      <TableCell>
-                        <span className="text-[10px] bg-muted px-2 py-1 rounded-full uppercase tracking-wider font-black text-muted-foreground">
-                          {exp.category}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-right font-black text-red-500 text-base">
-                        ${(exp.amount || 0).toLocaleString()}
-                      </TableCell>
+                      <TableCell><span className="text-[10px] bg-muted px-2 py-1 rounded-full uppercase tracking-wider font-black text-muted-foreground">{exp.category}</span></TableCell>
+                      <TableCell className="text-right font-black text-red-500 text-base">${(exp.amount || 0).toLocaleString()}</TableCell>
                       <TableCell className="text-right">
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-8 w-8 text-muted-foreground hover:text-red-500"
-                          onClick={() => handleDelete(exp.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-red-500" onClick={() => handleDelete(exp.id)}><Trash2 className="h-4 w-4" /></Button>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -302,9 +258,7 @@ export default function ExpensesPage() {
               </Table>
             ) : (
               <div className="flex flex-col items-center justify-center py-24 text-muted-foreground opacity-50">
-                <Receipt className="h-12 w-12 mb-3" />
-                <p className="font-bold">No hay gastos registrados</p>
-                <p className="text-xs text-center max-w-[200px]">Los egresos que cargues aparecerán listados aquí.</p>
+                <Receipt className="h-12 w-12 mb-3" /><p className="font-bold">No hay gastos registrados</p>
               </div>
             )}
           </CardContent>
